@@ -26,7 +26,7 @@ expired=0
 
 check_cert() {
   local name="$1" b64="$2" password="$3"
-  local dir subject notafter days
+  local dir keychain keychain_password subject notafter days
 
   if [ -z "$b64" ]; then
     printf '%s\tnot-configured\t-\t-\n' "$name" >> "$OUT"
@@ -34,11 +34,20 @@ check_cert() {
   fi
 
   dir="$(mktemp -d)"
+  keychain="$dir/health.keychain-db"
+  keychain_password="$(openssl rand -hex 16)"
   printf '%s' "$b64" | openssl base64 -d -A > "$dir/cert.p12"
 
-  if ! openssl pkcs12 -in "$dir/cert.p12" -clcerts -nokeys \
-      -passin "pass:$password" > "$dir/cert.pem" 2>/dev/null; then
-    printf '%s\tread-error(wrong password?)\t-\t-\n' "$name" >> "$OUT"
+  # 用 security import 解析,兼容 Apple Keychain 导出的 p12(openssl 3 可能读不了)。
+  security create-keychain -p "$keychain_password" "$keychain" >/dev/null 2>&1 || true
+  security set-keychain-settings -lut 600 "$keychain" >/dev/null 2>&1 || true
+  security unlock-keychain -p "$keychain_password" "$keychain" >/dev/null 2>&1 || true
+  security import "$dir/cert.p12" -k "$keychain" -P "$password" -A >/dev/null 2>&1 || true
+  security find-certificate -a -c "$name" -p "$keychain" > "$dir/cert.pem" 2>/dev/null || true
+  security delete-keychain "$keychain" >/dev/null 2>&1 || true
+
+  if [ ! -s "$dir/cert.pem" ]; then
+    printf '%s\tread-error(import/no matching cert)\t-\t-\n' "$name" >> "$OUT"
     rm -rf "$dir"
     alert=1
     return 0
