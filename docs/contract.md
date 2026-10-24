@@ -146,6 +146,10 @@ permissions:
 `APPLE_ASC_API_KEY` / `APPLE_ASC_API_KEY_ID` / `APPLE_ASC_ISSUER_ID`),
 调用方直接 `secrets: inherit`。其他组织若命名不同,仍可在 `jobs.<id>.secrets` 显式映射。
 
+`release: true` 时,reusable workflow 会自动打包发布物:
+`.app` → zip、`.zip` → 直传、`.dmg` / `.pkg` → 原生文件,并附带
+`<app>-<tag>-manifest.json` 与各自的 `.sha256`。
+
 composite action 不能提升权限,只能使用调用方授予的上限。
 
 ## 9. 安全规则

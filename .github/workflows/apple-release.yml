@@ -199,12 +199,64 @@ jobs:
           path: ${{ runner.temp }}/easyrelease-upload
           if-no-files-found: error
 
+      - name: 打包发布物(下游 zip / 原生)
+        if: inputs.release
+        env:
+          ARTIFACT: ${{ steps.sign.outputs.signed_artifact }}
+          MANIFEST: ${{ steps.sign.outputs.manifest_path }}
+          APP: ${{ inputs.app }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          [ -n "$TAG" ] || { echo "::error::release=true 时 release_tag 不能为空"; exit 1; }
+          out="$RUNNER_TEMP/easyrelease-release"
+          rm -rf "$out"
+          mkdir -p "$out"
+          files=()
+
+          case "$ARTIFACT" in
+            *.zip)
+              cp "$ARTIFACT" "$out/$APP-$TAG.zip"
+              files=("$out/$APP-$TAG.zip")
+              ;;
+            *.app)
+              stage="$out/stage"
+              mkdir -p "$stage"
+              ditto "$ARTIFACT" "$stage/$APP.app"
+              cp "$MANIFEST" "$stage/apple-manifest.json"
+              ditto -c -k "$stage" "$out/$APP-$TAG.zip"
+              files=("$out/$APP-$TAG.zip")
+              ;;
+            *.dmg)
+              cp "$ARTIFACT" "$out/$APP-$TAG.dmg"
+              files=("$out/$APP-$TAG.dmg")
+              ;;
+            *.pkg)
+              cp "$ARTIFACT" "$out/$APP-$TAG.pkg"
+              files=("$out/$APP-$TAG.pkg")
+              ;;
+            *)
+              echo "::error::不支持的发布产物:$ARTIFACT"
+              exit 1
+              ;;
+          esac
+
+          cp "$MANIFEST" "$out/$APP-$TAG-manifest.json"
+          files+=("$out/$APP-$TAG-manifest.json")
+          for f in "${files[@]}"; do
+            shasum -a 256 "$f" > "$f.sha256"
+            printf '%s\n' "$f" "$f.sha256" >> "$out/release-files.txt"
+          done
+          cat "$out/release-files.txt"
+
       - name: 创建 GitHub Release
         if: inputs.release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag }}
           FILES: ${{ inputs.release_files }}
+          PACKAGED_FILES: ${{ runner.temp }}/easyrelease-release/release-files.txt
           FALLBACK_ARTIFACT: ${{ steps.sign.outputs.signed_artifact }}
           MANIFEST: ${{ steps.sign.outputs.manifest_path }}
         run: |
@@ -220,9 +272,14 @@ jobs:
                 [ -e "$f" ] && files+=("$f")
               done
             done <<< "$FILES"
-          fi
-          if [ ${#files[@]} -eq 0 ]; then
+          elif [ -f "$PACKAGED_FILES" ]; then
+            while IFS= read -r f; do
+              [ -n "$f" ] && files+=("$f")
+            done < "$PACKAGED_FILES"
+          else
             files=("$FALLBACK_ARTIFACT" "$MANIFEST")
           fi
 
+          [ ${#files[@]} -gt 0 ] || { echo "::error::没有可发布文件"; exit 1; }
           gh release create "$TAG" "${files[@]}" --verify-tag --generate-notes
+
