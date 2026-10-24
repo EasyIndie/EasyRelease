@@ -156,12 +156,13 @@ composite action 不能提升权限,只能使用调用方授予的上限。
 
 ## 9. 安全规则
 
-1. 凭证只经 `secrets` → action 输入,不落盘到仓库。
-2. Apple 证书导入**临时 keychain**,`EXIT` trap 删除。
-3. `.p8` 写入 `RUNNER_TEMP` 后 `chmod 600`,用完删除。
-4. 不用 `set -x`;不打印 base64、密码、p8。
-5. 带凭证的 job 不加 `pull_request_target`,不让 fork PR 触达。
-6. 生产 pin SHA;tag 保护 + PR review。
+凭据的存放、导入、清理、轮换与排错统一见
+[credentials.md 第 10 节](credentials.md#10-安全规则);这里只保留 action 接口层约束:
+
+1. 凭证只经 `secrets` → 输入,不落盘、不回传。
+2. 带凭证的 job 不加 `pull_request_target`,不让 fork PR 触达。
+3. 生产 pin SHA;tag 保护 + PR review。
+4. action 内部临时文件由 `EXIT` trap 清理(实现见 `apple/scripts/`)。
 
 ## 10. 兼容矩阵
 

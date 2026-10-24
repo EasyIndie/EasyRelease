@@ -73,7 +73,7 @@ bash scripts/local-selftest.sh
 ```
 apple/                Apple 平台 composite action + 原生脚本
 lib/                  共享 shell 函数
-scripts/              本地自测
+scripts/              本地自测 + 证书健康检查
 .github/workflows/
   apple-release.yml   完整流水线(workflow_call)
   selftest.yml        无证书自测(adhoc + dry-run)
