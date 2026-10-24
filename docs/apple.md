@@ -165,3 +165,9 @@ reusable workflow 全链路(构建 → 签名 → 公证 → 上传)也验证通
 - notarization:`cbfc8bb4-53ff-418e-9af5-6d80cc6c0e01`(`status=Accepted`)
 - `spctl`:`accepted` / `source=Notarized Developer ID`
 - `contents: write` + `upload_artifact: true`,`release: false`
+
+`secrets: inherit` 版本(secret 名对齐组织后):
+
+- Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40097027827>
+- notarization:`6229b65c-de5c-4667-be8d-30b33f63bf63`(`status=Accepted`)
+- `spctl`:`accepted` / `source=Notarized Developer ID`

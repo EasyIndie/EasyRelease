@@ -16,6 +16,7 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | Developer ID 签名 | ✅ 已验证(2026-10-24,EasyApple EnvDemo,run [40095862502](https://github.com/EasyIndie/EasyApple/actions/runs/40095862502)) |
 | 公证 + staple | ✅ 已验证(同上,submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`) |
 | reusable workflow 全链路 | ✅ 已验证(2026-10-24,run [40096049639](https://github.com/EasyIndie/EasyApple/actions/runs/40096049639)) |
+| reusable + `secrets: inherit` | ✅ 已验证(2026-10-24,run [40097027827](https://github.com/EasyIndie/EasyApple/actions/runs/40097027827)) |
 | `.pkg` 签名 | ⚠️ 未验证(需 Developer ID Installer 证书) |
 | Android 签名 | ⏳ 未实现(契约已预留) |
 
