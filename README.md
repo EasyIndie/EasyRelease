@@ -20,8 +20,8 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | EasyApple Release dry-run | ✅ 已验证(2026-10-24,run [40099918160](https://github.com/EasyIndie/EasyApple/actions/runs/40099918160)) |
 | `.dmg` Developer ID + 公证 | ✅ 已验证(2026-10-24,run [40099541736](https://github.com/EasyIndie/EasyApple/actions/runs/40099541736),submission `9c43591c-25ca-4608-8566-3ab84cf43df1`) |
 | `.zip` 输入(内含 `.app` / `.dmg`) | ✅ 已验证(2026-10-24,run [40099541736](https://github.com/EasyIndie/EasyApple/actions/runs/40099541736),submission `06a78317-6150-4ab9-b4e3-d3182425b001`) |
-| App 专用密码公证 | ⚠️ 已实现;dry-run 认证选择已测,真实 app 专用密码待验证 |
-| `.pkg` 签名 | ⚠️ 未验证(需 Developer ID Installer 证书) |
+| App 专用密码公证 | ✅ 已验证(2026-10-24,run [40101281656](https://github.com/EasyIndie/EasyApple/actions/runs/40101281656),submission `cff3b8b8-02db-438b-ba05-c9446c9f9ad8`) |
+| `.pkg` 签名 | ⚠️ 代码已支持(含 Installer 身份自动匹配);未用真实 Installer 证书验证 |
 | Android 签名 | ⏳ 未实现(契约已预留) |
 
 > 没跑通的链路不要写成「已验证」。本仓库 selftest 覆盖 ad-hoc 与 dry-run;
@@ -132,6 +132,7 @@ docs/
 
 - [docs/contract.md](docs/contract.md):输入、输出、manifest、版本策略
 - [docs/apple.md](docs/apple.md):Apple 接入、凭证配置、排错
+- [docs/pkg.md](docs/pkg.md):`.pkg` 与 Developer ID Installer 证书获取、配置、验证
 
 ## 与 EasyApple 的关系
 

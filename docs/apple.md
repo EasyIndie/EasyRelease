@@ -44,7 +44,7 @@ EasyIndie 组织已有共享凭据,reusable workflow 的 secret 名与它们完�
 | 方式 | 输入 | 状态 |
 |---|---|---|
 | App Store Connect API Key | `notary_auth: api-key`(auto 下优先) | ✅ 实测 |
-| Apple ID + App 专用密码 | `notary_auth: apple-id` + `apple_id` / `apple_password` / `team_id` | ⚠️ 已实现,未用真实密码实测 |
+| Apple ID + App 专用密码 | `notary_auth: apple-id` + `apple_id` / `apple_password` / `team_id` | ✅ 实测 |
 
 Apple ID 示例:
 
@@ -188,7 +188,7 @@ bash apple/scripts/main.sh
 | 公证 + staple(`.app`) | ✅ 已验证(2026-10-24) | submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`,`stapler validate` 通过 |
 | `.dmg` Developer ID + 公证 | ✅ 已验证(2026-10-24) | run `40099541736`,submission `9c43591c-...`,`spctl -t open` 通过 |
 | `.zip` 输入 + 公证 | ✅ 已验证(2026-10-24) | run `40099541736`,submission `06a78317-...`,重打包后再次校验通过 |
-| App 专用密码公证 | ⚠️ 已实现,未实测 | dry-run 认证选择已测;需真实 app 专用密码 |
+| App 专用密码公证 | ✅ 已验证(2026-10-24) | run `40101281656`,submission `cff3b8b8-...` |
 | `.pkg` | ⚠️ 未验证 | 需 Developer ID Installer 证书 |
 
 `.pkg` 与 Android 链路补齐后,按同样格式追加记录。
@@ -239,3 +239,10 @@ DMG / ZIP 真链路(run `40099541736`,tag 前 `main`):
   重新打包后 `ditto -x -k` 解压,`codesign` / `stapler validate` / `spctl -a -t exec` 全部通过
 - manifest:`container=zip`、`inner_artifact=EnvDemo.app`、`inner_kind=app`,
   `notarized/stapled/verified=true`
+
+Apple ID + App 专用密码(run `40101281656`):
+
+- `notary auth: apple-id`
+- notarization:`cff3b8b8-02db-438b-ba05-c9446c9f9ad8`(`Accepted`)
+- `spctl`:`accepted` / `source=Notarized Developer ID`
+- manifest:`notary_auth=apple-id`、`notarized/stapled/verified=true`
