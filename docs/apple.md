@@ -174,8 +174,11 @@ reusable workflow 全链路(构建 → 签名 → 公证 → 上传)也验证通
 
 EasyApple 正式 `release.yml` dry-run(构建 → 公证 → zip + sha256,不建 Release):
 
-- Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40098005804>
-- notarization:`dc014cc6-8704-4c6f-b1e7-c17715b14234`(`status=Accepted`)
+- Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40098486383>(tag `0.3.0`)
+- notarization:`8271d395-63f3-412f-bb3a-946f228c8b59`(`status=Accepted`)
+- `sign` job 日志确认检出 `refs/tags/0.3.0`,与 `prepare` 的 tag 一致
 - 下载 zip 后用 `ditto -x -k` 解压,重新校验:`codesign` 通过、`Notarization Ticket=stapled`、
   `stapler validate` 通过、`spctl` `accepted` / `source=Notarized Developer ID`
 - `.sha256` 校验通过
+
+更早一次 dry-run(run `40098005804`,notarization `dc014cc6-...`)也通过。
