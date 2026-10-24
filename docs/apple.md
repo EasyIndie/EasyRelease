@@ -1,6 +1,7 @@
 # Apple 接入指南
 
-> ad-hoc 链路已在 macOS 27 / Xcode 27 本机验证;Developer ID 与公证链路尚未实测,见文末状态。
+> ad-hoc 链路已在 macOS 27 / Xcode 27 本机验证;Developer ID + 公证链路已于
+> 2026-10-24 用组织共享凭据在 EasyApple EnvDemo 验证通过,见文末「验证记录」。
 
 ## 1. 三种签名模式
 
@@ -132,8 +133,20 @@ bash apple/scripts/main.sh
 | ad-hoc `.dmg` | ✅ 已验证(2026-10-24) | 同上 |
 | dry-run(无证书) | ✅ 已验证(2026-10-24) | 同上 + CI selftest |
 | 证书导入 / 临时 keychain 清理 | ✅ 已验证(2026-10-24) | 自签名 p12 导入后按预期报「未找到 Developer ID」,无残留 |
-| Developer ID 签名 | ⚠️ 未验证 | 需付费账号 + 证书 |
-| 公证 + staple | ⚠️ 未验证 | 需 App Store Connect API Key |
+| Developer ID 签名 | ✅ 已验证(2026-10-24) | EasyApple EnvDemo,组织共享证书 |
+| 公证 + staple | ✅ 已验证(2026-10-24) | submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`,`stapler validate` 通过 |
 | `.pkg` | ⚠️ 未验证 | 需 Developer ID Installer 证书 |
 
-补齐真链路后,把这里改成「已验证」并附上命令与日期。
+`.pkg` 与 Android 链路补齐后,按同样格式追加记录。
+
+## 9. 验证记录
+
+2026-10-24,EasyApple `EnvDemo`(`com.easyapple.envdemo`,版本 `0.3.0` / build `300`):
+
+- Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40095862502>
+- identity:`Developer ID Application: Zhizhou Wang (2N62934Y28)`
+- notarization:`78a6fd71-1b0c-49c4-acf7-68e0e33f29af`(`status=Accepted`)
+- `stapler validate`:The validate action worked
+- `spctl`:`accepted`,`source=Notarized Developer ID`
+- manifest:`signed=true` / `notarized=true` / `stapled=true` / `gatekeeper=accepted` / `verified=true`
+- 产物:`app bundle with Mach-O thin (arm64)`,signature flags `runtime`,`Notarization Ticket=stapled`

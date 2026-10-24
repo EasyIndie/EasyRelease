@@ -13,12 +13,13 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | 能力 | 状态 |
 |---|---|
 | ad-hoc 签名 + 校验(`.app` / `.dmg`) | ✅ 已验证(2026-10-24,本机 macOS 27 / Xcode 27,13 项本地自测) |
-| Developer ID 签名 | ⚠️ 未验证(需付费开发者账号 + 证书) |
-| 公证 + staple | ⚠️ 未验证(需 App Store Connect API Key) |
+| Developer ID 签名 | ✅ 已验证(2026-10-24,EasyApple EnvDemo,run [40095862502](https://github.com/EasyIndie/EasyApple/actions/runs/40095862502)) |
+| 公证 + staple | ✅ 已验证(同上,submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`) |
 | `.pkg` 签名 | ⚠️ 未验证(需 Developer ID Installer 证书) |
 | Android 签名 | ⏳ 未实现(契约已预留) |
 
-> 没跑通的链路不要写成「已验证」。本仓库的 selftest 只覆盖 ad-hoc 与 dry-run。
+> 没跑通的链路不要写成「已验证」。本仓库 selftest 覆盖 ad-hoc 与 dry-run;
+> Developer ID + 公证通过 EasyApple 集成 run 验证(见上表)。
 
 ## 快速开始
 
