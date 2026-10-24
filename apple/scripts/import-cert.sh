@@ -22,8 +22,10 @@ easyrelease_import_cert() {
   security create-keychain -p "$keychain_password" "$EASYRELEASE_KEYCHAIN"
   security set-keychain-settings -lut 21600 "$EASYRELEASE_KEYCHAIN"
   security unlock-keychain -p "$keychain_password" "$EASYRELEASE_KEYCHAIN"
-  security import "$p12" -k "$EASYRELEASE_KEYCHAIN" -P "$p12_password" \
-    -T /usr/bin/codesign -T /usr/bin/security >/dev/null
+  # -A: 临时 keychain 内允许工具访问私钥,避免 productsign 在无头 runner 上弹授权框;
+  #      keychain 在 job 结束时删除。
+  security import "$p12" -k "$EASYRELEASE_KEYCHAIN" -P "$p12_password" -A \
+    -T /usr/bin/codesign -T /usr/bin/productsign -T /usr/bin/security >/dev/null
   security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
     -k "$keychain_password" "$EASYRELEASE_KEYCHAIN" >/dev/null
 

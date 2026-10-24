@@ -83,7 +83,14 @@ easyrelease_sign() {
         local out
         out="$RUNNER_TEMP/$(basename "$artifact").signed"
         easyrelease_temp "$out"
-        xcrun productsign --sign "$identity" --timestamp --keychain "$EASYRELEASE_KEYCHAIN" "$artifact" "$out"
+        # productsign 在无头 runner 上可能卡在钥匙串授权;限时 5 分钟并给出明确错误。
+        if command -v perl >/dev/null 2>&1; then
+          perl -e 'alarm 300; exec @ARGV' \
+            xcrun productsign --sign "$identity" --timestamp --keychain "$EASYRELEASE_KEYCHAIN" "$artifact" "$out" \
+            || die "productsign 失败或超时(300s)"
+        else
+          xcrun productsign --sign "$identity" --timestamp --keychain "$EASYRELEASE_KEYCHAIN" "$artifact" "$out"
+        fi
         mv "$out" "$artifact"
         ;;
     esac
