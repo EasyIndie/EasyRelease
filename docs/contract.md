@@ -38,6 +38,8 @@
 
 ## 4. Apple 专属输入
 
+> 凭据获取、导出、GitHub 配置与轮换统一见 [credentials.md](credentials.md)。
+
 | 输入 | 用途 | 何时必填 |
 |---|---|---|
 | `p12_base64` | Developer ID Application 证书;`.pkg` 用 Developer ID Installer | `mode=developer-id` |
@@ -162,6 +164,8 @@ composite action 不能提升权限,只能使用调用方授予的上限。
 6. 生产 pin SHA;tag 保护 + PR review。
 
 ## 10. 兼容矩阵
+
+> 实测 run 与公证 ID 见 [verification.md](verification.md)。
 
 | EasyRelease | Xcode | macOS | 备注 |
 |---|---|---|---|

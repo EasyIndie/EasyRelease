@@ -1,76 +1,36 @@
-# `.pkg` 与 Developer ID Installer
+# `.pkg` 构建与验证
 
-> 状态:✅ 已验证(2026-10-24)。EasyApple run `40105139059`,submission
-> `aa154aa3-e359-41f0-b5c8-240317b87d76`;`pkgutil --check-signature`、
-> `stapler validate`、`spctl -a -t install` 全部通过。
+> 证书获取、导出、GitHub secrets 配置、轮换统一见
+> [credentials.md](credentials.md);本文只讲 pkg 的构建、签名、公证和验证。
 
-## 1. 需要哪种证书
+## 1. 前置
 
-`.pkg` 安装包必须用 **Developer ID Installer** 证书签名,**不是**
-`Developer ID Application`。两者用途不同:
+`.pkg` 用 **Developer ID Installer** 证书;pkg 里的 app 仍然用
+**Developer ID Application** 签名。
 
-| 证书 | 用途 | 工具 |
-|---|---|---|
-| Developer ID Application | `.app` / `.dmg` / `.zip` 内的 app | `codesign` |
-| Developer ID Installer | `.pkg` 安装包 | `productsign` |
+- Installer 证书配置:见 [credentials.md](credentials.md) 第 4 节
+- secrets:`APPLE_INSTALLER_P12_BASE64`、`APPLE_INSTALLER_P12_PASSWORD`、
+  `APPLE_TEAM_ID`(+ 公证 API Key)
+- EasyRelease `v0.6.3+` 对 `.pkg` 自动按 Installer 身份查找;也可显式传
+  `identity: "Developer ID Installer: ..."`
 
-前置条件:付费 Apple Developer Program 账号,角色为 Account Holder 或 Admin。
+## 2. 先签 app,再打 pkg
 
-## 2. 获取证书
+这一步不能省:公证会检查 pkg 内 app 的 Developer ID 签名、timestamp 和
+hardened runtime。
 
-### 方式 A:Xcode(推荐)
-
-1. Xcode → Settings → Accounts → 选择团队
-2. Manage Certificates → 左下角 `+` → **Developer ID Installer**
-3. Xcode 会生成私钥并下载证书到登录钥匙串
-
-### 方式 B:Developer 网站
-
-1. 打开 [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/certificates/list)
-2. `Certificates` → `+` → 选 **Developer ID Installer** → Continue
-3. 在 Mac 上用 **Keychain Access** → Certificate Assistant →
-   Request a Certificate from a Certificate Authority
-   - 填 Apple ID 邮箱与名称
-   - 选 **Saved to disk**
-4. 上传生成的 `.certSigningRequest`
-5. 下载 `.cer` → 双击安装到登录钥匙串
-
-## 3. 导出 p12
-
-1. Keychain Access → `login` → **My Certificates**
-2. 找到 `Developer ID Installer: Name (TEAMID)`,确认它带有私钥(可展开)
-3. 右键 → Export → 保存为 `.p12`,设置导出密码
-4. 生成 base64:
-
-```bash
-openssl base64 -A -in installer.p12 > installer.p12.b64
-# 或:base64 -i installer.p12 | pbcopy
+```yaml
+- uses: EasyIndie/EasyRelease/apple@apple-v0.6.4
+  with:
+    artifact: build/MyApp.app
+    mode: developer-id
+    notarize: "false"
+    identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
+    p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+    p12_password: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
 ```
 
-> 不要把 `.p12` / 密码提交到仓库;只放 GitHub Secrets。
-
-## 4. 配置到 GitHub
-
-建议用 **organization secrets**:
-
-| Secret / Variable | 内容 |
-|---|---|
-| `APPLE_INSTALLER_P12_BASE64` | Installer `.p12` 的 base64 |
-| `APPLE_INSTALLER_P12_PASSWORD` | `.p12` 导出密码 |
-| `APPLE_TEAM_ID` | 10 位 Team ID |
-| `APPLE_ASC_API_KEY_ID` / `APPLE_ASC_ISSUER_ID` / `APPLE_ASC_API_KEY` | 公证用 API Key |
-| `MACOS_INSTALLER_IDENTITY`(可选 variable) | 完整身份,如 `Developer ID Installer: Name (TEAMID)` |
-
-不配 `MACOS_INSTALLER_IDENTITY` 也可以:EasyRelease `apple-v0.6.3+` 会对 `.pkg`
-自动按 `Developer ID Installer` + `team_id` 查找身份。
-
-## 5. 构建 pkg
-
-> **pkg 内的 app 必须先签 Developer ID Application(带 hardened runtime + timestamp),
-> 再用 pkgbuild 打包;否则公证会报「binary is not signed with a valid Developer ID /
-> no secure timestamp / hardened runtime disabled」。**
-
-EasyRelease 只做签名/公证,不负责构建。最小示例:
+然后打 pkg:
 
 ```bash
 root="$RUNNER_TEMP/pkg-root"
@@ -86,10 +46,10 @@ pkgbuild --root "$root" \
 
 需要安装向导/多包时用 `productbuild --distribution distribution.xml`。
 
-## 6. 用 EasyRelease 签名 + 公证
+## 3. 用 EasyRelease 签名 + 公证
 
 ```yaml
-- uses: EasyIndie/EasyRelease/apple@apple-v0.6.3
+- uses: EasyIndie/EasyRelease/apple@apple-v0.6.4
   with:
     artifact: MyApp.pkg
     mode: developer-id
@@ -103,10 +63,10 @@ pkgbuild --root "$root" \
     asc_key_p8: ${{ secrets.APPLE_ASC_API_KEY }}
 ```
 
-处理顺序:`productsign --timestamp` → `notarytool submit` → `stapler staple` →
+内部顺序:`productsign --timestamp` → 公证 → `stapler staple` →
 `spctl -a -t install`。
 
-## 7. 本地验证
+## 4. 本地验证
 
 ```bash
 pkgutil --check-signature MyApp.pkg
@@ -115,18 +75,15 @@ spctl -a -vvv -t install MyApp.pkg
 # 期望:accepted / source=Notarized Developer ID
 ```
 
-## 8. 证书轮换
+## 5. 实测与排错
 
-- 证书有效期以 Apple Developer 后台为准;到期前用新证书重新导出 p12。
-- 轮换顺序:先加新 secret → 跑一次 `verify-pkg.yml` → 再删旧 secret。
-- 泄露时立即在后台 Revoke,并更换 secret。
+- 实测记录(run / 公证 ID)见 [verification.md](verification.md)。
+- 证书/公证相关错误见 [credentials.md](credentials.md) 第 11 节。
+- `productsign` 在无头 runner 上的卡住问题已在 EasyRelease `v0.6.4`
+  修复(临时 keychain `-A` + 300s 超时)。
 
-## 9. 实跑验证
-
-EasyApple 已准备 `.github/workflows/verify-pkg.yml`:
+复现:
 
 ```bash
 gh workflow run verify-pkg.yml -R EasyIndie/EasyApple
 ```
-
-配置缺失时会在 preflight 明确列出缺少的 secret,不会进入签名步骤。

@@ -12,20 +12,18 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 
 | 能力 | 状态 |
 |---|---|
-| ad-hoc 签名 + 校验(`.app` / `.dmg` / `.zip`) | ✅ 已验证(2026-10-24,本机 macOS 27 / Xcode 27,22 项本地自测) |
-| Developer ID 签名 | ✅ 已验证(2026-10-24,EasyApple EnvDemo,run [40095862502](https://github.com/EasyIndie/EasyApple/actions/runs/40095862502)) |
-| 公证 + staple | ✅ 已验证(同上,submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`) |
-| reusable workflow 全链路 | ✅ 已验证(2026-10-24,run [40096049639](https://github.com/EasyIndie/EasyApple/actions/runs/40096049639)) |
-| reusable + `secrets: inherit` | ✅ 已验证(2026-10-24,run [40097027827](https://github.com/EasyIndie/EasyApple/actions/runs/40097027827)) |
-| EasyApple Release dry-run | ✅ 已验证(2026-10-24,run [40099918160](https://github.com/EasyIndie/EasyApple/actions/runs/40099918160)) |
-| `.dmg` Developer ID + 公证 | ✅ 已验证(2026-10-24,run [40099541736](https://github.com/EasyIndie/EasyApple/actions/runs/40099541736),submission `9c43591c-25ca-4608-8566-3ab84cf43df1`) |
-| `.zip` 输入(内含 `.app` / `.dmg`) | ✅ 已验证(2026-10-24,run [40099541736](https://github.com/EasyIndie/EasyApple/actions/runs/40099541736),submission `06a78317-6150-4ab9-b4e3-d3182425b001`) |
-| App 专用密码公证 | ✅ 已验证(2026-10-24,run [40101281656](https://github.com/EasyIndie/EasyApple/actions/runs/40101281656),submission `cff3b8b8-02db-438b-ba05-c9446c9f9ad8`) |
-| `.pkg` 签名 + 公证 | ✅ 已验证(2026-10-24,run [40105139059](https://github.com/EasyIndie/EasyApple/actions/runs/40105139059),submission `aa154aa3-e359-41f0-b5c8-240317b87d76`) |
-| Android 签名 | ⏳ 未实现(契约已预留) |
+| 本地 ad-hoc `.app` / `.dmg` / `.zip` | ✅ 22 项自测 |
+| `.app` Developer ID + 公证 | ✅ |
+| `.dmg` Developer ID + 公证 | ✅ |
+| `.zip` 输入 + 重打包校验 | ✅ |
+| `.pkg` + Developer ID Installer | ✅ |
+| API Key / Apple ID + 专用密码 | ✅ |
+| reusable workflow / `secrets: inherit` | ✅ |
+| `release.yml` dry-run | ✅ |
 
-> 没跑通的链路不要写成「已验证」。本仓库 selftest 覆盖 ad-hoc 与 dry-run;
-> Developer ID + 公证通过 EasyApple 集成 run 验证(见上表)。
+> run、公证 ID、复现命令与未覆盖项统一见 [docs/verification.md](docs/verification.md)。
+> 证书到期与轮换见 [docs/credentials.md](docs/credentials.md) 第 9 节;
+> 自动检查由 `.github/workflows/credential-health.yml` 每月执行。
 
 ## 快速开始
 
@@ -57,31 +55,8 @@ jobs:
 > 直接调用 `EasyRelease/apple` composite action 时没有 `inherit` 语义,
 > 仍需在 `with:` 里显式写 `p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}`。
 
-### 方式 B：只插入签名/公证步骤
-
-```yaml
-- uses: EasyIndie/EasyRelease/apple@apple-v0
-  id: sign
-  with:
-    artifact: .build/bundle/MyApp.app
-    mode: developer-id
-    notarize: "true"
-    identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
-    p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-    p12_password: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
-    asc_key_id: ${{ secrets.APPLE_ASC_API_KEY_ID }}
-    asc_issuer_id: ${{ secrets.APPLE_ASC_ISSUER_ID }}
-    asc_key_p8: ${{ secrets.APPLE_ASC_API_KEY }}
-```
-
-没有证书时先用 ad-hoc 验证接线：
-
-```yaml
-- uses: EasyIndie/EasyRelease/apple@apple-v0
-  with:
-    artifact: .build/bundle/MyApp.app
-    mode: adhoc
-```
+单步签名/公证、ad-hoc、`.zip` / `.dmg` / `.pkg` 的用法见
+[docs/apple.md](docs/apple.md)。
 
 ## 本地自测(不需要证书)
 
@@ -89,8 +64,9 @@ jobs:
 bash scripts/local-selftest.sh
 ```
 
-覆盖 ad-hoc `.app` / `.dmg`、dry-run、缺产物、`adhoc + notarize` 组合错误、缺证书等失败路径。
-2026-10-24 在本机(macOS 27.0.1 / Xcode 27.0)13 项全通过。
+覆盖 ad-hoc `.app` / `.dmg` / `.zip`、dry-run、缺产物、`adhoc + notarize`
+组合错误、缺证书等失败路径。2026-10-24 在本机(macOS 27.0.1 / Xcode 27.0)
+**22 项全通过**。
 
 ## 目录
 
@@ -131,10 +107,11 @@ docs/
 
 ## 文档
 
-- [docs/credentials.md](docs/credentials.md):**全部凭据的获取、导出、GitHub 配置与轮换**
-- [docs/contract.md](docs/contract.md):输入、输出、manifest、版本策略
-- [docs/apple.md](docs/apple.md):Apple 接入、凭证配置、排错
-- [docs/pkg.md](docs/pkg.md):`.pkg` 与 Developer ID Installer 证书获取、配置、验证
+- [docs/credentials.md](docs/credentials.md):**全部凭据的获取、导出、GitHub 配置、轮换与排错**
+- [docs/verification.md](docs/verification.md):**唯一验证记录**(run / 公证 ID / 未覆盖项)
+- [docs/contract.md](docs/contract.md):EasyRelease 输入、输出、manifest、版本策略
+- [docs/apple.md](docs/apple.md):Apple 接入、使用方式与排错
+- [docs/pkg.md](docs/pkg.md):`.pkg` 构建、签名、公证与验证
 
 ## 与 EasyApple 的关系
 

@@ -77,23 +77,66 @@ openssl base64 -A -in application.p12 > application.p12.b64
 
 ## 4. Developer ID Installer 证书
 
-用于 `.pkg`。获取步骤与 Application 相同,但证书类型选 **Developer ID Installer**。
+用于 `.pkg` 安装包。它与 Application 证书是**两张不同的证书**,不能混用。
+
+### 4.1 创建
+
+**方式 A:Xcode**
+
+1. Xcode → Settings → Accounts → 选择团队
+2. Manage Certificates → `+` → **Developer ID Installer**
+3. Xcode 生成私钥并下载证书到登录钥匙串
+
+**方式 B:Developer 网站**
+
+1. [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/certificates/list)
+2. `Certificates` → `+` → **Developer ID Installer**
+3. 用 Keychain Access → Certificate Assistant → Request a Certificate
+   - 填 Apple ID 邮箱和名称
+   - 选 **Saved to disk**
+4. 上传 `.certSigningRequest` → 下载 `.cer` → 双击安装
+
+### 4.2 导出 p12
+
+1. Keychain Access → `login` → **My Certificates**
+2. 找到 `Developer ID Installer: Name (TEAMID)`,确认带私钥
+3. 右键 → Export → `installer.p12`,设置密码
+4. 转 base64:
 
 ```bash
-# 导出
 openssl base64 -A -in installer.p12 > installer.p12.b64
 ```
+
+### 4.3 配置
 
 | Secret / Variable | 值 |
 |---|---|
 | `APPLE_INSTALLER_P12_BASE64` | `installer.p12.b64` 的内容 |
 | `APPLE_INSTALLER_P12_PASSWORD` | p12 导出密码 |
+| `APPLE_TEAM_ID` | Team ID |
 | `MACOS_INSTALLER_IDENTITY`(variable,可选) | `Developer ID Installer: Name (TEAMID)` |
 
-详细步骤、`pkgbuild` 示例和 `pkgutil`/`spctl` 验证见 [pkg.md](pkg.md)。
+不配 `MACOS_INSTALLER_IDENTITY` 也可以:EasyRelease `v0.6.3+` 对 `.pkg` 自动按
+Installer 身份查找。
 
-> 注意:`.pkg` 里的 app 必须先签 **Developer ID Application**(hardened runtime +
-> secure timestamp),再 `pkgbuild`;否则公证会报 app 签名无效。
+### 4.4 pkg 构建
+
+`.pkg` 里的 app 必须先签 **Developer ID Application**(hardened runtime +
+secure timestamp),再 `pkgbuild`;否则公证会报 app 签名无效。
+
+```bash
+root="$RUNNER_TEMP/pkg-root"
+mkdir -p "$root"
+ditto "build/MyApp.app" "$root/MyApp.app"
+
+pkgbuild --root "$root" \
+  --identifier com.example.myapp \
+  --version 1.2.0 \
+  --install-location /Applications \
+  MyApp.pkg
+```
+
+构建、签名、公证、`pkgutil`/`spctl` 验证的完整示例见 [pkg.md](pkg.md)。
 
 ## 5. App Store Connect Team API Key(推荐公证方式)
 
@@ -189,7 +232,6 @@ gh secret set APPLE_ASC_API_KEY --org EasyIndie < AuthKey_XXXXXXXXXX.p8
 gh secret set APPLE_TEAM_ID --org EasyIndie --body "ABCDE12345"
 
 # 签名身份用 variable
-
 gh variable set MACOS_SIGNING_IDENTITY --org EasyIndie \
   --body "Developer ID Application: Name (ABCDE12345)"
 gh variable set MACOS_INSTALLER_IDENTITY --org EasyIndie \
@@ -216,21 +258,10 @@ gh variable set MACOS_INSTALLER_IDENTITY --org EasyIndie \
 
 ## 8. 验证
 
-| 工作流(EasyApple) | 验证内容 |
-|---|---|
-| `verify-release.yml` | composite action + `.app` Developer ID/公证 |
-| `verify-reusable.yml` | reusable workflow 全链路 |
-| `verify-formats.yml` | `.dmg` 与 `.zip` 输入 |
-| `verify-apple-id.yml` | Apple ID + App 专用密码 |
-| `verify-pkg.yml` | `.pkg` + Installer 证书 |
+配置完成后跑对应验证工作流;工作流列表、复现命令和实测结果统一见
+[verification.md](verification.md) 第 3 节。
 
-手动运行:
-
-```bash
-gh workflow run verify-pkg.yml -R EasyIndie/EasyApple
-```
-
-本地验证:
+本地快速校验:
 
 ```bash
 # app
@@ -250,6 +281,8 @@ spctl -a -vvv -t install MyApp.pkg
 
 期望:`accepted` / `source=Notarized Developer ID`。
 
+自动到期检查见 `.github/workflows/credential-health.yml`(每月 1 日,≤30 天开 issue)。
+
 ## 9. 轮换与撤销
 
 ### 9.1 会到期的证书
@@ -261,8 +294,9 @@ EasyRelease 当前只用两张会到期的证书:
 | Developer ID Application | 通常 5 年(以 NotAfter 为准) | `.app` / `.dmg` / `.zip` | `APPLE_CERTIFICATE_P12_BASE64`、`..._PASSWORD`、`MACOS_SIGNING_IDENTITY` | `verify-release.yml` / `verify-formats.yml` |
 | Developer ID Installer | 通常 5 年(以 NotAfter 为准) | `.pkg` | `APPLE_INSTALLER_P12_BASE64`、`..._PASSWORD`、`MACOS_INSTALLER_IDENTITY` | `verify-pkg.yml` |
 
-> 2026-10-24 观测:当前组织的 Installer 证书 `NotAfter=2027-02-01`,
-> 建议至少在 2027-01-02 前完成轮换。Application 证书请用下面的命令自查。
+> 2026-10-24 观测:Application `NotAfter=2031-05-19`(约 1667 天),
+> Installer `NotAfter=2027-02-01`(约 100 天)。建议至少在 2027-01-02 前轮换 Installer。
+> 自动检查:`.github/workflows/credential-health.yml`(每月 1 日)。
 
 ### 9.2 不会按固定周期到期,但仍需轮换
 
