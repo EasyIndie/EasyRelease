@@ -17,7 +17,7 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | 公证 + staple | ✅ 已验证(同上,submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`) |
 | reusable workflow 全链路 | ✅ 已验证(2026-10-24,run [40096049639](https://github.com/EasyIndie/EasyApple/actions/runs/40096049639)) |
 | reusable + `secrets: inherit` | ✅ 已验证(2026-10-24,run [40097027827](https://github.com/EasyIndie/EasyApple/actions/runs/40097027827)) |
-| EasyApple Release dry-run | ✅ 已验证(2026-10-24,run [40098486383](https://github.com/EasyIndie/EasyApple/actions/runs/40098486383)) |
+| EasyApple Release dry-run | ✅ 已验证(2026-10-24,run [40099918160](https://github.com/EasyIndie/EasyApple/actions/runs/40099918160)) |
 | `.dmg` Developer ID + 公证 | ✅ 已验证(2026-10-24,run [40099541736](https://github.com/EasyIndie/EasyApple/actions/runs/40099541736),submission `9c43591c-25ca-4608-8566-3ab84cf43df1`) |
 | `.zip` 输入(内含 `.app` / `.dmg`) | ✅ 已验证(2026-10-24,run [40099541736](https://github.com/EasyIndie/EasyApple/actions/runs/40099541736),submission `06a78317-6150-4ab9-b4e3-d3182425b001`) |
 | App 专用密码公证 | ⚠️ 已实现;dry-run 认证选择已测,真实 app 专用密码待验证 |

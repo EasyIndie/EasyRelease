@@ -49,7 +49,7 @@ EasyIndie 组织已有共享凭据,reusable workflow 的 secret 名与它们完�
 Apple ID 示例:
 
 ```yaml
-- uses: EasyIndie/EasyRelease/apple@apple-v0.6.0
+- uses: EasyIndie/EasyRelease/apple@apple-v0.6.1
   with:
     artifact: MyApp.app
     mode: developer-id
@@ -128,7 +128,7 @@ jobs:
 `.zip` 必须恰好包含一个 `.app` / `.dmg` / `.pkg`(可以嵌套在子目录):
 
 ```yaml
-- uses: EasyIndie/EasyRelease/apple@apple-v0.6.0
+- uses: EasyIndie/EasyRelease/apple@apple-v0.6.1
   with:
     artifact: dist/MyApp.zip
     mode: developer-id
@@ -220,14 +220,15 @@ reusable workflow 全链路(构建 → 签名 → 公证 → 上传)也验证通
 
 EasyApple 正式 `release.yml` dry-run(构建 → 公证 → zip + sha256,不建 Release):
 
-- Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40098486383>(tag `0.3.0`)
-- notarization:`8271d395-63f3-412f-bb3a-946f228c8b59`(`status=Accepted`)
+- Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40099918160>(tag `0.3.0`)
+- notarization:`12b46464-cd74-434e-848b-d6018fc60aac`(`status=Accepted`)
 - `sign` job 日志确认检出 `refs/tags/0.3.0`,与 `prepare` 的 tag 一致
 - 下载 zip 后用 `ditto -x -k` 解压,重新校验:`codesign` 通过、`Notarization Ticket=stapled`、
   `stapler validate` 通过、`spctl` `accepted` / `source=Notarized Developer ID`
-- `.sha256` 校验通过
+- `.sha256` 校验通过(含 `*-manifest.json` 与 zip)
+- 发布步骤按产物类型处理:`.app` → zip、`.zip` → 直传、`.dmg`/`.pkg` → 原生
 
-更早一次 dry-run(run `40098005804`,notarization `dc014cc6-...`)也通过。
+更早的 dry-run:`40098486383`(notarization `8271d395-...`)、`40098005804`(`dc014cc6-...`)也通过。
 
 DMG / ZIP 真链路(run `40099541736`,tag 前 `main`):
 
