@@ -105,7 +105,8 @@ if [ "$alert" -eq 1 ]; then
     echo ""
     render_table
     echo ""
-    echo "轮换步骤见 [docs/credentials.md](../blob/main/docs/credentials.md) 第 9 节。"
+    repo="${GITHUB_REPOSITORY:-EasyIndie/EasyRelease}"
+    echo "轮换步骤见 [docs/credentials.md](https://github.com/${repo}/blob/main/docs/credentials.md) 第 9 节。"
   } > "$ALERT"
 fi
 
