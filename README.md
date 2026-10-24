@@ -41,17 +41,16 @@ jobs:
       identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
       release: true
       release_tag: ${{ github.ref_name }}
-    secrets:
-      APPLE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-      APPLE_P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
-      ASC_KEY_ID: ${{ secrets.APPLE_ASC_API_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
-      ASC_KEY_P8: ${{ secrets.APPLE_ASC_API_KEY }}
+    secrets: inherit
 ```
 
-> reusable workflow 的 secret 名是通用名(`APPLE_P12_BASE64` 等),与组织现有
-> `APPLE_CERTIFICATE_P12_BASE64` 不同时,必须像上面这样显式映射;`secrets: inherit`
-> 只在两边命名完全一致时可用。
+> reusable workflow 的 secret 名已与 EasyIndie 组织完全一致
+> (`APPLE_CERTIFICATE_P12_BASE64` / `APPLE_CERTIFICATE_P12_PASSWORD` /
+> `APPLE_ASC_API_KEY` / `APPLE_ASC_API_KEY_ID` / `APPLE_ASC_ISSUER_ID`),
+> 所以直接 `secrets: inherit` 即可。
+>
+> 直接调用 `EasyRelease/apple` composite action 时没有 `inherit` 语义,
+> 仍需在 `with:` 里显式写 `p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}`。
 
 ### 方式 B：只插入签名/公证步骤
 
@@ -62,12 +61,12 @@ jobs:
     artifact: .build/bundle/MyApp.app
     mode: developer-id
     notarize: "true"
-    p12_base64: ${{ secrets.APPLE_P12_BASE64 }}
-    p12_password: ${{ secrets.APPLE_P12_PASSWORD }}
-    team_id: ${{ secrets.APPLE_TEAM_ID }}
-    asc_key_id: ${{ secrets.ASC_KEY_ID }}
-    asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
-    asc_key_p8: ${{ secrets.ASC_KEY_P8 }}
+    identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
+    p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+    p12_password: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
+    asc_key_id: ${{ secrets.APPLE_ASC_API_KEY_ID }}
+    asc_issuer_id: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+    asc_key_p8: ${{ secrets.APPLE_ASC_API_KEY }}
 ```
 
 没有证书时先用 ad-hoc 验证接线：
@@ -109,7 +108,10 @@ docs/
 
 | tag | 含义 |
 |---|---|
-| `apple-v0.1.0` | Apple 平台不可变版本 |
+| `apple-v0.1.0` | Apple 平台首个版本 |
+| `apple-v0.2.0` | 支持显式 `identity`、base64 p8 |
+| `apple-v0.3.x` | 真链路验证 + 文档 |
+| `apple-v0.4.0` | reusable workflow secret 名对齐 EasyIndie 组织,支持 `secrets: inherit` |
 | `apple-v0` | 浮动别名,只用于试用 |
 | `android-v0.x` | 预留,与 Apple 独立演进 |
 

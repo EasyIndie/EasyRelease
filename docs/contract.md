@@ -98,7 +98,7 @@
 
 | 平台 | 不可变 tag | 浮动别名 |
 |---|---|---|
-| Apple | `apple-v0.1.0` | `apple-v0` |
+| Apple | `apple-v0.4.0` | `apple-v0` |
 | Android | `android-v0.1.0` | `android-v0` |
 
 - 破坏性变更 → 升主版本,旧主版本保留至少一个大版本周期。
@@ -119,9 +119,10 @@ permissions:
   contents: write   # 只有 release=true 时需要
 ```
 
-`workflow_call` 的 secret 名是通用名(`APPLE_P12_BASE64` 等)。如果组织现有 secret
-命名不同(如 `APPLE_CERTIFICATE_P12_BASE64`),调用方要在 `jobs.<id>.secrets` 显式映射;
-`secrets: inherit` 不会改名。
+`workflow_call` 的 secret 名与 EasyIndie 组织一致
+(`APPLE_CERTIFICATE_P12_BASE64` / `APPLE_CERTIFICATE_P12_PASSWORD` /
+`APPLE_ASC_API_KEY` / `APPLE_ASC_API_KEY_ID` / `APPLE_ASC_ISSUER_ID`),
+调用方直接 `secrets: inherit`。其他组织若命名不同,仍可在 `jobs.<id>.secrets` 显式映射。
 
 composite action 不能提升权限,只能使用调用方授予的上限。
 

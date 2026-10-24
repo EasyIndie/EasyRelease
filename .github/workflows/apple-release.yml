@@ -77,20 +77,22 @@ on:
         type: string
         required: false
         default: ""
+    # 名称与 EasyIndie 组织 secret 完全一致,调用方可直接 secrets: inherit。
     secrets:
-      APPLE_P12_BASE64:
+      APPLE_CERTIFICATE_P12_BASE64:
         required: false
-      APPLE_P12_PASSWORD:
+      APPLE_CERTIFICATE_P12_PASSWORD:
         required: false
+      APPLE_ASC_API_KEY_ID:
+        required: false
+      APPLE_ASC_ISSUER_ID:
+        required: false
+      APPLE_ASC_API_KEY:
+        required: false
+      # 可选:组织的 Team ID / 自定义 keychain 密码
       APPLE_TEAM_ID:
         required: false
       APPLE_KEYCHAIN_PASSWORD:
-        required: false
-      ASC_KEY_ID:
-        required: false
-      ASC_ISSUER_ID:
-        required: false
-      ASC_KEY_P8:
         required: false
 
 permissions:
@@ -143,14 +145,14 @@ jobs:
           staple: ${{ inputs.staple }}
           dry_run: ${{ inputs.dry_run }}
           bundle_id: ${{ inputs.bundle_id }}
-          p12_base64: ${{ secrets.APPLE_P12_BASE64 }}
-          p12_password: ${{ secrets.APPLE_P12_PASSWORD }}
+          p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          p12_password: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
           team_id: ${{ secrets.APPLE_TEAM_ID }}
           identity: ${{ inputs.identity }}
           keychain_password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
-          asc_key_id: ${{ secrets.ASC_KEY_ID }}
-          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
-          asc_key_p8: ${{ secrets.ASC_KEY_P8 }}
+          asc_key_id: ${{ secrets.APPLE_ASC_API_KEY_ID }}
+          asc_issuer_id: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+          asc_key_p8: ${{ secrets.APPLE_ASC_API_KEY }}
 
       - name: 上传产物与 manifest
         if: inputs.upload_artifact

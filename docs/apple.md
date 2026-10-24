@@ -15,23 +15,27 @@
 
 | Secret | 内容 | 获取方式 |
 |---|---|---|
-| `APPLE_P12_BASE64` | Developer ID Application 证书 `.p12` 的 base64 | Keychain 导出后 `base64 -i cert.p12 \| pbcopy` |
-| `APPLE_P12_PASSWORD` | 导出时设置的密码 | — |
-| `APPLE_TEAM_ID` | 10 位 Team ID | Apple Developer 后台 |
-| `ASC_KEY_ID` | App Store Connect API Key ID | App Store Connect → Users and Access → Integrations |
-| `ASC_ISSUER_ID` | Issuer ID | 同上 |
-| `ASC_KEY_P8` | `AuthKey_XXX.p8` 文件内容(PEM 或 base64) | 同上(只能下载一次) |
+EasyIndie 组织已有共享凭据,reusable workflow 的 secret 名与它们完全一致,直接 `secrets: inherit`:
 
-EasyIndie 组织已有共享凭据,可直接映射(不要复制到各仓库):
+| 组织 secret / variable | 用途 |
+|---|---|
+| `APPLE_CERTIFICATE_P12_BASE64` | Developer ID Application 证书 `.p12` 的 base64 |
+| `APPLE_CERTIFICATE_P12_PASSWORD` | `.p12` 密码 |
+| `APPLE_ASC_API_KEY_ID` | App Store Connect API Key ID |
+| `APPLE_ASC_ISSUER_ID` | Issuer ID |
+| `APPLE_ASC_API_KEY` | API 私钥(PEM 或 base64) |
+| `vars.MACOS_SIGNING_IDENTITY` | 完整签名身份 |
 
-| EasyRelease 输入 | 组织 secret / variable |
+直接调用 composite action 时,再映射到 action 输入:
+
+| action 输入 | 组织 secret / variable |
 |---|---|
 | `p12_base64` | `APPLE_CERTIFICATE_P12_BASE64` |
 | `p12_password` | `APPLE_CERTIFICATE_P12_PASSWORD` |
 | `asc_key_id` | `APPLE_ASC_API_KEY_ID` |
 | `asc_issuer_id` | `APPLE_ASC_ISSUER_ID` |
 | `asc_key_p8` | `APPLE_ASC_API_KEY` |
-| `identity` | `vars.MACOS_SIGNING_IDENTITY`(repo / org variable) |
+| `identity` | `vars.MACOS_SIGNING_IDENTITY` |
 
 `identity` 可写完整名称(如 `Developer ID Application: Name (TEAMID)`)或 SHA-1;留空时按 `team_id` 匹配。
 
@@ -50,7 +54,7 @@ permissions:
 
 jobs:
   release:
-    uses: EasyIndie/EasyRelease/.github/workflows/apple-release.yml@apple-v0.1.0
+    uses: EasyIndie/EasyRelease/.github/workflows/apple-release.yml@apple-v0.4.0
     with:
       app: MyApp
       bundle_id: com.easyindie.myapp
@@ -60,20 +64,13 @@ jobs:
       identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
       release: true
       release_tag: ${{ github.ref_name }}
-    secrets:
-      APPLE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-      APPLE_P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
-      ASC_KEY_ID: ${{ secrets.APPLE_ASC_API_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
-      ASC_KEY_P8: ${{ secrets.APPLE_ASC_API_KEY }}
+    secrets: inherit
 ```
 
 默认产物路径是 `apps/<app>/.build/bundle/<app>.app`;不是这个布局就显式传 `artifact`。
 
-> reusable workflow 的 secret 是通用名(`APPLE_P12_BASE64` 等)。组织现有名称是
-> `APPLE_CERTIFICATE_P12_BASE64` / `APPLE_CERTIFICATE_P12_PASSWORD` /
-> `APPLE_ASC_API_KEY` / `APPLE_ASC_API_KEY_ID` / `APPLE_ASC_ISSUER_ID`,
-> 必须显式映射;`secrets: inherit` 只在命名完全一致时可用。
+> reusable workflow 的 secret 名已与 EasyIndie 组织完全一致,直接 `secrets: inherit`。
+> 只有直接调用 composite action 时,才需要在 `with:` 里显式映射(见上表)。
 
 ## 4. 接入方式 B:只要签名/公证
 
@@ -84,19 +81,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash tools/bundle.sh
-      - uses: EasyIndie/EasyRelease/apple@apple-v0.1.0
+      - uses: EasyIndie/EasyRelease/apple@apple-v0.4.0
         id: sign
         with:
           artifact: .build/bundle/MyApp.app
           mode: developer-id
           notarize: "true"
           entitlements: MyApp.entitlements
-          p12_base64: ${{ secrets.APPLE_P12_BASE64 }}
-          p12_password: ${{ secrets.APPLE_P12_PASSWORD }}
-          team_id: ${{ secrets.APPLE_TEAM_ID }}
-          asc_key_id: ${{ secrets.ASC_KEY_ID }}
-          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
-          asc_key_p8: ${{ secrets.ASC_KEY_P8 }}
+          identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
+          p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          p12_password: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
+          asc_key_id: ${{ secrets.APPLE_ASC_API_KEY_ID }}
+          asc_issuer_id: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+          asc_key_p8: ${{ secrets.APPLE_ASC_API_KEY }}
       - run: echo "ticket=${{ steps.sign.outputs.notarization_id }}"
 ```
 
