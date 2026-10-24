@@ -32,6 +32,7 @@
 | `version` | | 从 Info.plist | 写入 manifest |
 | `build_number` | | 从 Info.plist | 写入 manifest |
 | `bundle_id` | | 从 Info.plist | 写入 manifest |
+| `checkout_ref` | | 事件 ref | reusable workflow 检出业务仓库的 ref |
 | `output_dir` | | `$GITHUB_WORKSPACE/easyrelease` | manifest 输出目录 |
 | `debug` | | `false` | 打印环境信息,不打印密钥 |
 

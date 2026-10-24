@@ -13,6 +13,11 @@ on:
         type: string
         required: false
         default: apple-v0
+      checkout_ref:
+        description: "检出业务仓库的 ref;留空用事件 ref"
+        type: string
+        required: false
+        default: ""
       app:
         description: "应用名,用于 artifact 命名与默认路径"
         type: string
@@ -108,6 +113,8 @@ jobs:
     steps:
       - name: 检出业务仓库
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
 
       - name: 检出 EasyRelease
         uses: actions/checkout@v4
