@@ -252,10 +252,61 @@ spctl -a -vvv -t install MyApp.pkg
 
 ## 9. 轮换与撤销
 
-- 证书到期前:创建新证书 → 导出新 p12 → 更新 secret → 跑验证工作流 → 删除旧 secret。
+### 9.1 会到期的证书
+
+EasyRelease 当前只用两张会到期的证书:
+
+| 证书 | 典型有效期 | 用途 | 更新项 | 验证工作流 |
+|---|---|---|---|---|
+| Developer ID Application | 通常 5 年(以 NotAfter 为准) | `.app` / `.dmg` / `.zip` | `APPLE_CERTIFICATE_P12_BASE64`、`..._PASSWORD`、`MACOS_SIGNING_IDENTITY` | `verify-release.yml` / `verify-formats.yml` |
+| Developer ID Installer | 通常 5 年(以 NotAfter 为准) | `.pkg` | `APPLE_INSTALLER_P12_BASE64`、`..._PASSWORD`、`MACOS_INSTALLER_IDENTITY` | `verify-pkg.yml` |
+
+> 2026-10-24 观测:当前组织的 Installer 证书 `NotAfter=2027-02-01`,
+> 建议至少在 2027-01-02 前完成轮换。Application 证书请用下面的命令自查。
+
+### 9.2 不会按固定周期到期,但仍需轮换
+
+| 凭据 | 到期行为 | 轮换触发 |
+|---|---|---|
+| App Store Connect Team API Key | 没有固定到期时间 | 泄露、人员变动、按安全策略定期轮换 |
+| Apple ID App 专用密码 | 没有固定到期时间 | 泄露、重置 Apple ID 密码/安全设置变更、定期轮换 |
+| Team ID | 不会变 | 不需要 |
+| p12 导出密码 | 不单独到期 | 随证书一起换 |
+| 临时 keychain 密码 | 每次 job 随机生成 | 不需要 |
+
+### 9.3 查证书到期
+
+本机:
+
+```bash
+for c in "Developer ID Application" "Developer ID Installer"; do
+  echo "== $c"
+  security find-certificate -a -c "$c" -p \
+    | openssl x509 -noout -subject -enddate
+done
+```
+
+从 p12 看(不导入 keychain):
+
+```bash
+openssl pkcs12 -in application.p12 -clcerts -nokeys \
+  -passin pass:'<p12密码>' | openssl x509 -noout -subject -enddate
+```
+
+### 9.4 轮换顺序
+
+1. 在 Apple Developer 后台创建新证书(旧证书先不要 Revoke)。
+2. 从 Keychain 导出新 `.p12`,生成单行 base64。
+3. 更新对应 secret;若证书 CN 变化,同时更新 `MACOS_*_IDENTITY` variable。
+4. 跑对应验证工作流(见上表),确认签名 + 公证 + Gatekeeper 通过。
+5. 观察一个发布周期后,再 Revoke 旧证书、删除旧 p12。
+6. 保留一份旧 p12 在离线安全位置,便于回滚(不要入库)。
+
+### 9.5 撤销
+
 - p8 泄露:App Store Connect → Integrations → 撤销 Key,重新生成。
 - App 专用密码泄露:Apple ID → App-Specific Passwords → 撤销。
-- 证书私钥泄露:Developer 后台 Revoke 证书,重新签发。
+- 证书私钥泄露:Developer 后台 Revoke 证书,重新签发并轮换。
 - 建议在到期前 30 天设提醒;EasyRelease 的 manifest 会记录公证 ID 便于追溯。
 
 ## 10. 安全规则
