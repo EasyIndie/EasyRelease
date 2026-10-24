@@ -1,7 +1,8 @@
 # `.pkg` 与 Developer ID Installer
 
-> 状态:EasyRelease 代码路径已支持(`productsign` + `notarytool` + `stapler` + `spctl -t install`),
-> 但**尚未用真实 Installer 证书实跑**。配好证书后跑 EasyApple 的 `verify-pkg.yml` 即可补齐。
+> 状态:✅ 已验证(2026-10-24)。EasyApple run `40105139059`,submission
+> `aa154aa3-e359-41f0-b5c8-240317b87d76`;`pkgutil --check-signature`、
+> `stapler validate`、`spctl -a -t install` 全部通过。
 
 ## 1. 需要哪种证书
 

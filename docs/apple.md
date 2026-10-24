@@ -189,7 +189,7 @@ bash apple/scripts/main.sh
 | `.dmg` Developer ID + 公证 | ✅ 已验证(2026-10-24) | run `40099541736`,submission `9c43591c-...`,`spctl -t open` 通过 |
 | `.zip` 输入 + 公证 | ✅ 已验证(2026-10-24) | run `40099541736`,submission `06a78317-...`,重打包后再次校验通过 |
 | App 专用密码公证 | ✅ 已验证(2026-10-24) | run `40101281656`,submission `cff3b8b8-...` |
-| `.pkg` | ⚠️ 未验证 | 需 Developer ID Installer 证书 |
+| `.pkg` | ✅ 已验证(2026-10-24) | run `40105139059`,submission `aa154aa3-...`;Installer 身份 |
 
 `.pkg` 与 Android 链路补齐后,按同样格式追加记录。
 
