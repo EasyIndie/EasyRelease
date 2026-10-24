@@ -41,11 +41,12 @@
 |---|---|---|
 | `p12_base64` | Developer ID Application 证书 | `mode=developer-id` |
 | `p12_password` | p12 密码 | `mode=developer-id` |
-| `team_id` | 匹配签名身份 | 建议填 |
+| `team_id` | 按 Team ID 匹配签名身份 | 建议填 |
+| `identity` | 完整签名身份(名称或 SHA-1) | 留空则用 `team_id` 匹配 |
 | `keychain_password` | 临时 keychain 密码 | 留空自动生成 |
 | `asc_key_id` | App Store Connect API Key ID | `notarize=true` |
 | `asc_issuer_id` | App Store Connect Issuer ID | `notarize=true` |
-| `asc_key_p8` | API 私钥内容 | `notarize=true` |
+| `asc_key_p8` | API 私钥内容(PEM 或 base64) | `notarize=true` |
 | `entitlements` | hardened runtime 权限文件 | 按需 |
 | `timeout` | 公证等待超时,默认 `30m` | 按需 |
 

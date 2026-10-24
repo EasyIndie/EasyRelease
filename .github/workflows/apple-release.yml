@@ -22,6 +22,11 @@ on:
         type: string
         required: false
         default: ""
+      identity:
+        description: "完整签名身份;留空按 team_id 查找"
+        type: string
+        required: false
+        default: ""
       artifact:
         description: "产物路径;留空则用 apps/<app>/.build/bundle/<app>.app"
         type: string
@@ -141,6 +146,7 @@ jobs:
           p12_base64: ${{ secrets.APPLE_P12_BASE64 }}
           p12_password: ${{ secrets.APPLE_P12_PASSWORD }}
           team_id: ${{ secrets.APPLE_TEAM_ID }}
+          identity: ${{ inputs.identity }}
           keychain_password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
           asc_key_id: ${{ secrets.ASC_KEY_ID }}
           asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}

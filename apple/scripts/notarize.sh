@@ -25,7 +25,15 @@ easyrelease_notarize() {
 
   p8_file="$RUNNER_TEMP/AuthKey_${key_id}.p8"
   easyrelease_temp "$p8_file"
-  (umask 077; printf '%s\n' "$key_p8" > "$p8_file")
+  case "$key_p8" in
+    *"BEGIN PRIVATE KEY"*)
+      (umask 077; printf '%s\n' "$key_p8" > "$p8_file")
+      ;;
+    *)
+      (umask 077; printf '%s' "$key_p8" | openssl base64 -d -A > "$p8_file")
+      ;;
+  esac
+  [ -s "$p8_file" ] || die "asc_key_p8 解析失败(需要 PEM 或 base64)"
 
   out="$RUNNER_TEMP/easyrelease-notary.json"
   log="$RUNNER_TEMP/easyrelease-notary.log"

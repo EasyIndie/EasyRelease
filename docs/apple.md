@@ -19,7 +19,20 @@
 | `APPLE_TEAM_ID` | 10 位 Team ID | Apple Developer 后台 |
 | `ASC_KEY_ID` | App Store Connect API Key ID | App Store Connect → Users and Access → Integrations |
 | `ASC_ISSUER_ID` | Issuer ID | 同上 |
-| `ASC_KEY_P8` | `AuthKey_XXX.p8` 文件内容 | 同上(只能下载一次) |
+| `ASC_KEY_P8` | `AuthKey_XXX.p8` 文件内容(PEM 或 base64) | 同上(只能下载一次) |
+
+EasyIndie 组织已有共享凭据,可直接映射(不要复制到各仓库):
+
+| EasyRelease 输入 | 组织 secret / variable |
+|---|---|
+| `p12_base64` | `APPLE_CERTIFICATE_P12_BASE64` |
+| `p12_password` | `APPLE_CERTIFICATE_P12_PASSWORD` |
+| `asc_key_id` | `APPLE_ASC_API_KEY_ID` |
+| `asc_issuer_id` | `APPLE_ASC_ISSUER_ID` |
+| `asc_key_p8` | `APPLE_ASC_API_KEY` |
+| `identity` | `vars.MACOS_SIGNING_IDENTITY`(repo / org variable) |
+
+`identity` 可写完整名称(如 `Developer ID Application: Name (TEAMID)`)或 SHA-1;留空时按 `team_id` 匹配。
 
 建议放在 **organization secrets**,按仓库授予可见性;不要每个项目复制一份。
 

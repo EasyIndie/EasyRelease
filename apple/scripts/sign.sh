@@ -19,6 +19,9 @@ easyrelease_sign_nested() {
   local timestamp="$4"
   local -a args=(--force --sign "$identity")
   local p
+  if [ "$identity" != "-" ] && [ -n "${EASYRELEASE_KEYCHAIN:-}" ]; then
+    args+=(--keychain "$EASYRELEASE_KEYCHAIN")
+  fi
 
   if is_true "$runtime"; then args+=(--options runtime); fi
   if is_true "$timestamp"; then args+=(--timestamp); fi
@@ -63,6 +66,7 @@ easyrelease_sign() {
       app)
         easyrelease_sign_nested "$artifact" "$identity" true true
         local -a args=(--force --sign "$identity" --options runtime --timestamp)
+        args+=(--keychain "$EASYRELEASE_KEYCHAIN")
         if [ -n "$entitlements" ]; then
           [ -f "$entitlements" ] || die "entitlements 文件不存在:$entitlements"
           args+=(--entitlements "$entitlements")
@@ -70,14 +74,14 @@ easyrelease_sign() {
         codesign "${args[@]}" "$artifact"
         ;;
       dmg)
-        codesign --force --sign "$identity" --timestamp "$artifact"
+        codesign --force --sign "$identity" --timestamp --keychain "$EASYRELEASE_KEYCHAIN" "$artifact"
         ;;
       pkg)
         [ -f "$entitlements" ] && warn "entitlements 对 .pkg 不生效,已忽略"
         local out
         out="$RUNNER_TEMP/$(basename "$artifact").signed"
         easyrelease_temp "$out"
-        xcrun productsign --sign "$identity" --timestamp "$artifact" "$out"
+        xcrun productsign --sign "$identity" --timestamp --keychain "$EASYRELEASE_KEYCHAIN" "$artifact" "$out"
         mv "$out" "$artifact"
         ;;
     esac

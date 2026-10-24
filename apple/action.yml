@@ -33,6 +33,10 @@ inputs:
     description: "Apple Team ID,用于匹配签名身份"
     required: false
     default: ""
+  identity:
+    description: "完整签名身份(如 Developer ID Application: Name (TEAM));留空则按 team_id 查找"
+    required: false
+    default: ""
   keychain_password:
     description: "临时 keychain 密码;留空自动生成"
     required: false
@@ -112,6 +116,7 @@ runs:
         EASYRELEASE_P12_BASE64: ${{ inputs.p12_base64 }}
         EASYRELEASE_P12_PASSWORD: ${{ inputs.p12_password }}
         EASYRELEASE_TEAM_ID: ${{ inputs.team_id }}
+        EASYRELEASE_IDENTITY: ${{ inputs.identity }}
         EASYRELEASE_KEYCHAIN_PASSWORD: ${{ inputs.keychain_password }}
         EASYRELEASE_ASC_KEY_ID: ${{ inputs.asc_key_id }}
         EASYRELEASE_ASC_ISSUER_ID: ${{ inputs.asc_issuer_id }}

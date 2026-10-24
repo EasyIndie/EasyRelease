@@ -23,6 +23,7 @@ DEBUG="${EASYRELEASE_DEBUG:-false}"
 P12_BASE64="${EASYRELEASE_P12_BASE64:-}"
 P12_PASSWORD="${EASYRELEASE_P12_PASSWORD:-}"
 TEAM_ID="${EASYRELEASE_TEAM_ID:-}"
+IDENTITY_INPUT="${EASYRELEASE_IDENTITY:-}"
 KEYCHAIN_PASSWORD="${EASYRELEASE_KEYCHAIN_PASSWORD:-}"
 
 ASC_KEY_ID="${EASYRELEASE_ASC_KEY_ID:-}"
@@ -122,7 +123,12 @@ else
     easyrelease_sign "$ARTIFACT" "-" adhoc ""
   else
     easyrelease_import_cert "$P12_BASE64" "$P12_PASSWORD" "$KEYCHAIN_PASSWORD"
-    IDENTITY="$(easyrelease_find_identity "$TEAM_ID")"
+    if [ -n "$IDENTITY_INPUT" ]; then
+      IDENTITY="$IDENTITY_INPUT"
+      security find-identity -v -p codesigning "$EASYRELEASE_KEYCHAIN" | grep -Fq "$IDENTITY"         || die "指定的 identity 不在临时 keychain 中:$IDENTITY"
+    else
+      IDENTITY="$(easyrelease_find_identity "$TEAM_ID")"
+    fi
     ok "签名身份:$IDENTITY"
     easyrelease_sign "$ARTIFACT" "$IDENTITY" developer-id "$ENTITLEMENTS"
   fi
