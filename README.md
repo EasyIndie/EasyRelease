@@ -15,6 +15,7 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | ad-hoc 签名 + 校验(`.app` / `.dmg`) | ✅ 已验证(2026-10-24,本机 macOS 27 / Xcode 27,13 项本地自测) |
 | Developer ID 签名 | ✅ 已验证(2026-10-24,EasyApple EnvDemo,run [40095862502](https://github.com/EasyIndie/EasyApple/actions/runs/40095862502)) |
 | 公证 + staple | ✅ 已验证(同上,submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`) |
+| reusable workflow 全链路 | ✅ 已验证(2026-10-24,run [40096049639](https://github.com/EasyIndie/EasyApple/actions/runs/40096049639)) |
 | `.pkg` 签名 | ⚠️ 未验证(需 Developer ID Installer 证书) |
 | Android 签名 | ⏳ 未实现(契约已预留) |
 
@@ -37,10 +38,20 @@ jobs:
       build_command: swift build -c release && bash tools/bundle.sh
       mode: developer-id
       notarize: true
+      identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
       release: true
       release_tag: ${{ github.ref_name }}
-    secrets: inherit
+    secrets:
+      APPLE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+      APPLE_P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
+      ASC_KEY_ID: ${{ secrets.APPLE_ASC_API_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.APPLE_ASC_API_KEY }}
 ```
+
+> reusable workflow 的 secret 名是通用名(`APPLE_P12_BASE64` 等),与组织现有
+> `APPLE_CERTIFICATE_P12_BASE64` 不同时,必须像上面这样显式映射;`secrets: inherit`
+> 只在两边命名完全一致时可用。
 
 ### 方式 B：只插入签名/公证步骤
 

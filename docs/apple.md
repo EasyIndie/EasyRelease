@@ -57,12 +57,23 @@ jobs:
       build_command: bash tools/bundle.sh --platform macOS
       mode: developer-id
       notarize: true
+      identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
       release: true
       release_tag: ${{ github.ref_name }}
-    secrets: inherit
+    secrets:
+      APPLE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+      APPLE_P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
+      ASC_KEY_ID: ${{ secrets.APPLE_ASC_API_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.APPLE_ASC_API_KEY }}
 ```
 
 默认产物路径是 `apps/<app>/.build/bundle/<app>.app`;不是这个布局就显式传 `artifact`。
+
+> reusable workflow 的 secret 是通用名(`APPLE_P12_BASE64` 等)。组织现有名称是
+> `APPLE_CERTIFICATE_P12_BASE64` / `APPLE_CERTIFICATE_P12_PASSWORD` /
+> `APPLE_ASC_API_KEY` / `APPLE_ASC_API_KEY_ID` / `APPLE_ASC_ISSUER_ID`,
+> 必须显式映射;`secrets: inherit` 只在命名完全一致时可用。
 
 ## 4. 接入方式 B:只要签名/公证
 
@@ -150,3 +161,10 @@ bash apple/scripts/main.sh
 - `spctl`:`accepted`,`source=Notarized Developer ID`
 - manifest:`signed=true` / `notarized=true` / `stapled=true` / `gatekeeper=accepted` / `verified=true`
 - 产物:`app bundle with Mach-O thin (arm64)`,signature flags `runtime`,`Notarization Ticket=stapled`
+
+reusable workflow 全链路(构建 → 签名 → 公证 → 上传)也验证通过:
+
+- Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40096049639>
+- notarization:`cbfc8bb4-53ff-418e-9af5-6d80cc6c0e01`(`status=Accepted`)
+- `spctl`:`accepted` / `source=Notarized Developer ID`
+- `contents: write` + `upload_artifact: true`,`release: false`

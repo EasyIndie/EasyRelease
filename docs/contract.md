@@ -119,6 +119,10 @@ permissions:
   contents: write   # 只有 release=true 时需要
 ```
 
+`workflow_call` 的 secret 名是通用名(`APPLE_P12_BASE64` 等)。如果组织现有 secret
+命名不同(如 `APPLE_CERTIFICATE_P12_BASE64`),调用方要在 `jobs.<id>.secrets` 显式映射;
+`secrets: inherit` 不会改名。
+
 composite action 不能提升权限,只能使用调用方授予的上限。
 
 ## 9. 安全规则
