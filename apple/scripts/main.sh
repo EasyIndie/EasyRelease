@@ -189,10 +189,14 @@ else
     easyrelease_import_cert "$P12_BASE64" "$P12_PASSWORD" "$KEYCHAIN_PASSWORD"
     if [ -n "$IDENTITY_INPUT" ]; then
       IDENTITY="$IDENTITY_INPUT"
-      security find-identity -v -p codesigning "$EASYRELEASE_KEYCHAIN" | grep -Fq "$IDENTITY" \
+      security find-identity -v "$EASYRELEASE_KEYCHAIN" | grep -Fq "$IDENTITY" \
         || die "指定的 identity 不在临时 keychain 中:$IDENTITY"
     else
-      IDENTITY="$(easyrelease_find_identity "$TEAM_ID")"
+      identity_label="Developer ID Application"
+      if [ "$KIND" = "pkg" ]; then
+        identity_label="Developer ID Installer"
+      fi
+      IDENTITY="$(easyrelease_find_identity "$TEAM_ID" "$identity_label")"
     fi
     ok "签名身份:$IDENTITY"
     easyrelease_sign "$ARTIFACT" "$IDENTITY" developer-id "$ENTITLEMENTS"

@@ -122,6 +122,7 @@ docs/
 | `apple-v0.6.0` | 支持 `.zip` 输入、App 专用密码公证 |
 | `apple-v0.6.1` | reusable workflow 透传 App 专用密码认证 |
 | `apple-v0.6.2` | `release: true` 时自动打包:`.app` → zip、`.zip` 直传、`.dmg`/`.pkg` 原生 |
+| `apple-v0.6.3` | 签名身份查找支持 `Developer ID Installer`(`.pkg`) |
 | `apple-v0` | 浮动别名,只用于试用 |
 | `android-v0.x` | 预留,与 Apple 独立演进 |
 

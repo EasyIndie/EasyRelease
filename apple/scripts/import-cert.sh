@@ -44,10 +44,12 @@ easyrelease_import_cert() {
 
 easyrelease_find_identity() {
   local team_id="${1:-}"
+  local label="${2:-Developer ID Application}"
   local all identity
 
-  all="$(security find-identity -v -p codesigning "$EASYRELEASE_KEYCHAIN" \
-    | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p')"
+  # Installer 证书不属于 codesigning policy,这里不指定 -p,统一按名称筛选。
+  all="$(security find-identity -v "$EASYRELEASE_KEYCHAIN" \
+    | sed -n "s/.*\"\\($label: .*\\)\"/\\1/p")"
 
   if [ -n "$team_id" ]; then
     identity="$(printf '%s\n' "$all" | grep -F "($team_id)" | head -1 || true)"
@@ -55,8 +57,8 @@ easyrelease_find_identity() {
     identity="$(printf '%s\n' "$all" | head -1)"
   fi
 
-  [ -n "$identity" ] || die "未找到 Developer ID Application 证书(team_id=${team_id:-未指定})"
-  [ -n "$team_id" ] || warn "未指定 team_id,使用找到的第一个 Developer ID Application 身份"
+  [ -n "$identity" ] || die "未找到 $label 证书(team_id=${team_id:-未指定})"
+  [ -n "$team_id" ] || warn "未指定 team_id,使用找到的第一个 $label 身份"
   printf '%s' "$identity"
 }
 

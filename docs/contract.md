@@ -40,10 +40,10 @@
 
 | 输入 | 用途 | 何时必填 |
 |---|---|---|
-| `p12_base64` | Developer ID Application 证书 | `mode=developer-id` |
+| `p12_base64` | Developer ID Application 证书;`.pkg` 用 Developer ID Installer | `mode=developer-id` |
 | `p12_password` | p12 密码 | `mode=developer-id` |
 | `team_id` | 按 Team ID 匹配签名身份 | 建议填 |
-| `identity` | 完整签名身份(名称或 SHA-1) | 留空则用 `team_id` 匹配 |
+| `identity` | 完整签名身份(名称或 SHA-1) | 留空则按产物类型匹配 Application / Installer |
 | `keychain_password` | 临时 keychain 密码 | 留空自动生成 |
 | `notary_auth` | `auto` / `api-key` / `apple-id` | 默认 `auto` |
 | `apple_id` | Apple ID | `notary_auth=apple-id` |
