@@ -18,9 +18,9 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | reusable workflow 全链路 | ✅ 已验证(2026-10-24,run [40096049639](https://github.com/EasyIndie/EasyApple/actions/runs/40096049639)) |
 | reusable + `secrets: inherit` | ✅ 已验证(2026-10-24,run [40097027827](https://github.com/EasyIndie/EasyApple/actions/runs/40097027827)) |
 | EasyApple Release dry-run | ✅ 已验证(2026-10-24,run [40098486383](https://github.com/EasyIndie/EasyApple/actions/runs/40098486383)) |
-| `.dmg` Developer ID + 公证 | ⏳ 本轮验证中 |
-| `.zip` 输入(内含 `.app` / `.dmg`) | ⏳ 真实公证本轮验证中;ad-hoc 已本地通过 |
-| App 专用密码公证 | ⏳ 已实现,真实公证待验证 |
+| `.dmg` Developer ID + 公证 | ✅ 已验证(2026-10-24,run [40099541736](https://github.com/EasyIndie/EasyApple/actions/runs/40099541736),submission `9c43591c-25ca-4608-8566-3ab84cf43df1`) |
+| `.zip` 输入(内含 `.app` / `.dmg`) | ✅ 已验证(2026-10-24,run [40099541736](https://github.com/EasyIndie/EasyApple/actions/runs/40099541736),submission `06a78317-6150-4ab9-b4e3-d3182425b001`) |
+| App 专用密码公证 | ⚠️ 已实现;dry-run 认证选择已测,真实 app 专用密码待验证 |
 | `.pkg` 签名 | ⚠️ 未验证(需 Developer ID Installer 证书) |
 | Android 签名 | ⏳ 未实现(契约已预留) |
 
@@ -120,6 +120,7 @@ docs/
 | `apple-v0.5.0` | 上传 artifact 改为扁平目录(`<app>.app` + `apple-manifest.json`) |
 | `apple-v0.5.1` | reusable workflow 支持 `checkout_ref`,dry-run 也检出目标 tag |
 | `apple-v0.6.0` | 支持 `.zip` 输入、App 专用密码公证 |
+| `apple-v0.6.1` | reusable workflow 透传 App 专用密码认证 |
 | `apple-v0` | 浮动别名,只用于试用 |
 | `android-v0.x` | 预留,与 Apple 独立演进 |
 

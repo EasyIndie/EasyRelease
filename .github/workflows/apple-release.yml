@@ -32,6 +32,16 @@ on:
         type: string
         required: false
         default: ""
+      notary_auth:
+        description: "公证认证:auto / api-key / apple-id"
+        type: string
+        required: false
+        default: auto
+      apple_id:
+        description: "Apple ID(仅 apple-id 认证)"
+        type: string
+        required: false
+        default: ""
       artifact:
         description: "产物路径;留空则用 apps/<app>/.build/bundle/<app>.app"
         type: string
@@ -93,6 +103,10 @@ on:
       APPLE_ASC_ISSUER_ID:
         required: false
       APPLE_ASC_API_KEY:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
         required: false
       # 可选:组织的 Team ID / 自定义 keychain 密码
       APPLE_TEAM_ID:
@@ -157,6 +171,9 @@ jobs:
           team_id: ${{ secrets.APPLE_TEAM_ID }}
           identity: ${{ inputs.identity }}
           keychain_password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          notary_auth: ${{ inputs.notary_auth }}
+          apple_id: ${{ inputs.apple_id || secrets.APPLE_ID }}
+          apple_password: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           asc_key_id: ${{ secrets.APPLE_ASC_API_KEY_ID }}
           asc_issuer_id: ${{ secrets.APPLE_ASC_ISSUER_ID }}
           asc_key_p8: ${{ secrets.APPLE_ASC_API_KEY }}

@@ -140,7 +140,8 @@ permissions:
   contents: write   # 只有 release=true 时需要
 ```
 
-`workflow_call` 的 secret 名与 EasyIndie 组织一致
+`workflow_call` 额外支持 `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD`(App 专用密码认证);
+其 secret 名与 EasyIndie 组织一致
 (`APPLE_CERTIFICATE_P12_BASE64` / `APPLE_CERTIFICATE_P12_PASSWORD` /
 `APPLE_ASC_API_KEY` / `APPLE_ASC_API_KEY_ID` / `APPLE_ASC_ISSUER_ID`),
 调用方直接 `secrets: inherit`。其他组织若命名不同,仍可在 `jobs.<id>.secrets` 显式映射。

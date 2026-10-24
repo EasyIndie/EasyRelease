@@ -39,6 +39,32 @@ EasyIndie 组织已有共享凭据,reusable workflow 的 secret 名与它们完�
 
 `identity` 可写完整名称(如 `Developer ID Application: Name (TEAMID)`)或 SHA-1;留空时按 `team_id` 匹配。
 
+### 公证认证方式
+
+| 方式 | 输入 | 状态 |
+|---|---|---|
+| App Store Connect API Key | `notary_auth: api-key`(auto 下优先) | ✅ 实测 |
+| Apple ID + App 专用密码 | `notary_auth: apple-id` + `apple_id` / `apple_password` / `team_id` | ⚠️ 已实现,未用真实密码实测 |
+
+Apple ID 示例:
+
+```yaml
+- uses: EasyIndie/EasyRelease/apple@apple-v0.6.0
+  with:
+    artifact: MyApp.app
+    mode: developer-id
+    notarize: "true"
+    identity: ${{ vars.MACOS_SIGNING_IDENTITY }}
+    notary_auth: apple-id
+    apple_id: ${{ secrets.APPLE_ID }}
+    apple_password: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+    team_id: ${{ secrets.APPLE_TEAM_ID }}
+    p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+    p12_password: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
+```
+
+`apple_password` 必须是 **App 专用密码**,不是 Apple ID 登录密码。
+
 建议放在 **organization secrets**,按仓库授予可见性;不要每个项目复制一份。
 
 ## 3. 接入方式 A:完整流水线
@@ -97,7 +123,23 @@ jobs:
       - run: echo "ticket=${{ steps.sign.outputs.notarization_id }}"
 ```
 
-## 5. 本地复现
+## 5. .zip 输入
+
+`.zip` 必须恰好包含一个 `.app` / `.dmg` / `.pkg`(可以嵌套在子目录):
+
+```yaml
+- uses: EasyIndie/EasyRelease/apple@apple-v0.6.0
+  with:
+    artifact: dist/MyApp.zip
+    mode: developer-id
+    notarize: "true"
+    # 其余签名/公证参数同上
+```
+
+输出是 `dist/MyApp-signed.zip`;manifest 里 `artifact_kind=zip`、`container=zip`、
+`inner_artifact` 指向 zip 内产物。重新打包后会再解压校验一次,确认签名/staple 未被破坏。
+
+## 6. 本地复现
 
 ```bash
 # ad-hoc
@@ -110,7 +152,7 @@ bash apple/scripts/main.sh
 
 `manifest.json` 默认写到 `$GITHUB_WORKSPACE/easyrelease/`。
 
-## 6. 顺序(不要颠倒)
+## 7. 顺序(不要颠倒)
 
 1. 签嵌套代码(dylib / framework / xpc / appex / 内嵌 app)
 2. 签主 app(`--options runtime --timestamp`)
@@ -121,7 +163,7 @@ bash apple/scripts/main.sh
 
 先打包再 staple 是最常见的错误:票据没进 bundle,离线机器仍会被拦。
 
-## 7. 排错
+## 8. 排错
 
 | 症状 | 原因 | 处理 |
 |---|---|---|
@@ -133,21 +175,25 @@ bash apple/scripts/main.sh
 | `spctl` 报 `source=no usable signature` | ad-hoc 模式 | 预期行为,ad-hoc 不参与 Gatekeeper |
 | 公证超时 | Apple 队列慢 | 调大 `timeout`,job `timeout-minutes` 也要大于它 |
 
-## 8. 状态
+## 9. 状态
 
 | 链路 | 状态 | 验证方式 |
 |---|---|---|
 | ad-hoc `.app` | ✅ 已验证(2026-10-24) | 本机 macOS 27 / Xcode 27 + `scripts/local-selftest.sh` |
 | ad-hoc `.dmg` | ✅ 已验证(2026-10-24) | 同上 |
+| ad-hoc `.zip`(内含 `.app` / `.dmg`) | ✅ 已验证(2026-10-24) | `scripts/local-selftest.sh`(22 项) |
 | dry-run(无证书) | ✅ 已验证(2026-10-24) | 同上 + CI selftest |
 | 证书导入 / 临时 keychain 清理 | ✅ 已验证(2026-10-24) | 自签名 p12 导入后按预期报「未找到 Developer ID」,无残留 |
 | Developer ID 签名 | ✅ 已验证(2026-10-24) | EasyApple EnvDemo,组织共享证书 |
-| 公证 + staple | ✅ 已验证(2026-10-24) | submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`,`stapler validate` 通过 |
+| 公证 + staple(`.app`) | ✅ 已验证(2026-10-24) | submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`,`stapler validate` 通过 |
+| `.dmg` Developer ID + 公证 | ✅ 已验证(2026-10-24) | run `40099541736`,submission `9c43591c-...`,`spctl -t open` 通过 |
+| `.zip` 输入 + 公证 | ✅ 已验证(2026-10-24) | run `40099541736`,submission `06a78317-...`,重打包后再次校验通过 |
+| App 专用密码公证 | ⚠️ 已实现,未实测 | dry-run 认证选择已测;需真实 app 专用密码 |
 | `.pkg` | ⚠️ 未验证 | 需 Developer ID Installer 证书 |
 
 `.pkg` 与 Android 链路补齐后,按同样格式追加记录。
 
-## 9. 验证记录
+## 10. 验证记录
 
 2026-10-24,EasyApple `EnvDemo`(`com.easyapple.envdemo`,版本 `0.3.0` / build `300`):
 
@@ -182,3 +228,13 @@ EasyApple 正式 `release.yml` dry-run(构建 → 公证 → zip + sha256,不建
 - `.sha256` 校验通过
 
 更早一次 dry-run(run `40098005804`,notarization `dc014cc6-...`)也通过。
+
+DMG / ZIP 真链路(run `40099541736`,tag 前 `main`):
+
+- `.dmg`:notarization `9c43591c-25ca-4608-8566-3ab84cf43df1`(`Accepted`);
+  `stapler validate` 通过;`spctl -a -t open --context context:primary-signature` →
+  `accepted` / `source=Notarized Developer ID`;`codesign` 显示 `Notarization Ticket=stapled`
+- `.zip`(内含 `.app`):notarization `06a78317-6150-4ab9-b4e3-d3182425b001`(`Accepted`);
+  重新打包后 `ditto -x -k` 解压,`codesign` / `stapler validate` / `spctl -a -t exec` 全部通过
+- manifest:`container=zip`、`inner_artifact=EnvDemo.app`、`inner_kind=app`,
+  `notarized/stapled/verified=true`
