@@ -1,0 +1,140 @@
+name: selftest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apple/**"
+      - "lib/**"
+      - ".github/workflows/**"
+      - "docs/**"
+      - "README.md"
+  pull_request:
+    paths:
+      - "apple/**"
+      - "lib/**"
+      - ".github/workflows/**"
+      - "docs/**"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash 语法
+        run: bash -n lib/common.sh apple/scripts/*.sh
+      - name: shellcheck(可选)
+        run: |
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck -x lib/common.sh apple/scripts/*.sh
+          else
+            echo "shellcheck 未安装,跳过"
+          fi
+
+  adhoc:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 造一个最小 .app
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/Hello.app"
+          mkdir -p "$app/Contents/MacOS"
+          cp /bin/echo "$app/Contents/MacOS/Hello"
+          cat > "$app/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleIdentifier</key><string>com.easyindie.hello</string>
+            <key>CFBundleName</key><string>Hello</string>
+            <key>CFBundleExecutable</key><string>Hello</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>0.0.1</string>
+            <key>CFBundleVersion</key><string>1</string>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$app/Contents/Info.plist"
+          echo "APP=$app" >> "$GITHUB_ENV"
+
+      - name: adhoc 签名
+        id: adhoc
+        uses: ./apple
+        with:
+          artifact: ${{ env.APP }}
+          mode: adhoc
+
+      - name: 断言 adhoc 结果
+        run: |
+          set -euo pipefail
+          test "${{ steps.adhoc.outputs.verified }}" = "true"
+          test -f "${{ steps.adhoc.outputs.manifest_path }}"
+          python3 -m json.tool "${{ steps.adhoc.outputs.manifest_path }}" >/dev/null
+          codesign --verify --deep --strict "${{ steps.adhoc.outputs.signed_artifact }}"
+          plutil -extract platform raw -o - "${{ steps.adhoc.outputs.manifest_path }}" | grep -qx apple
+          plutil -extract mode raw -o - "${{ steps.adhoc.outputs.manifest_path }}" | grep -qx adhoc
+
+      - name: 造 dmg 并 adhoc 签名
+        run: |
+          set -euo pipefail
+          hdiutil create -volname Hello -srcfolder "$APP" -ov -format UDZO "$RUNNER_TEMP/Hello.dmg"
+          echo "DMG=$RUNNER_TEMP/Hello.dmg" >> "$GITHUB_ENV"
+
+      - name: adhoc 签名 dmg
+        id: dmg
+        uses: ./apple
+        with:
+          artifact: ${{ env.DMG }}
+          mode: adhoc
+
+      - name: 断言 dmg
+        run: |
+          set -euo pipefail
+          test "${{ steps.dmg.outputs.verified }}" = "true"
+          plutil -extract artifact_kind raw -o - "${{ steps.dmg.outputs.manifest_path }}" | grep -qx dmg
+
+      - name: dry-run developer-id(无证书)
+        id: dry
+        uses: ./apple
+        with:
+          artifact: ${{ env.APP }}
+          mode: developer-id
+          notarize: "true"
+          dry_run: "true"
+
+      - name: 断言 dry-run
+        run: |
+          set -euo pipefail
+          test "${{ steps.dry.outputs.verified }}" = "false"
+          plutil -extract dry_run raw -o - "${{ steps.dry.outputs.manifest_path }}" | grep -qx true
+          plutil -extract signed raw -o - "${{ steps.dry.outputs.manifest_path }}" | grep -qx false
+
+      - name: 缺产物应失败
+        id: missing
+        continue-on-error: true
+        uses: ./apple
+        with:
+          artifact: ${{ runner.temp }}/does-not-exist.app
+
+      - name: 断言失败
+        run: test "${{ steps.missing.outcome }}" = "failure"
+
+      - name: adhoc + notarize 应失败
+        id: bad_combo
+        continue-on-error: true
+        uses: ./apple
+        with:
+          artifact: ${{ env.APP }}
+          mode: adhoc
+          notarize: "true"
+
+      - name: 断言组合错误
+        run: test "${{ steps.bad_combo.outcome }}" = "failure"

@@ -1,0 +1,185 @@
+name: Apple Release
+
+on:
+  workflow_call:
+    inputs:
+      runs_on:
+        description: "runner 标签;默认 xcode-27(含 Xcode 27)"
+        type: string
+        required: false
+        default: xcode-27
+      kit_ref:
+        description: "EasyRelease 的 ref(tag / SHA);生产建议 pin SHA"
+        type: string
+        required: false
+        default: apple-v0
+      app:
+        description: "应用名,用于 artifact 命名与默认路径"
+        type: string
+        required: true
+      bundle_id:
+        description: "Bundle ID;可留空,由 Info.plist 推断"
+        type: string
+        required: false
+        default: ""
+      artifact:
+        description: "产物路径;留空则用 apps/<app>/.build/bundle/<app>.app"
+        type: string
+        required: false
+        default: ""
+      build_command:
+        description: "构建命令;留空表示产物已存在"
+        type: string
+        required: false
+        default: ""
+      mode:
+        description: "adhoc 或 developer-id"
+        type: string
+        required: false
+        default: adhoc
+      notarize:
+        description: "是否公证(仅 developer-id)"
+        type: boolean
+        required: false
+        default: false
+      staple:
+        description: "公证后是否 staple"
+        type: boolean
+        required: false
+        default: true
+      dry_run:
+        description: "只校验输入并产出 manifest"
+        type: boolean
+        required: false
+        default: false
+      upload_artifact:
+        description: "是否上传产物与 manifest"
+        type: boolean
+        required: false
+        default: true
+      release:
+        description: "是否创建 GitHub Release"
+        type: boolean
+        required: false
+        default: false
+      release_tag:
+        description: "Release tag(必须已存在)"
+        type: string
+        required: false
+        default: ""
+      release_files:
+        description: "额外发布文件,每行一个 glob;留空则用产物 + manifest"
+        type: string
+        required: false
+        default: ""
+    secrets:
+      APPLE_P12_BASE64:
+        required: false
+      APPLE_P12_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      APPLE_KEYCHAIN_PASSWORD:
+        required: false
+      ASC_KEY_ID:
+        required: false
+      ASC_ISSUER_ID:
+        required: false
+      ASC_KEY_P8:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ${{ inputs.runs_on }}
+    timeout-minutes: 90
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出业务仓库
+        uses: actions/checkout@v4
+
+      - name: 检出 EasyRelease
+        uses: actions/checkout@v4
+        with:
+          repository: EasyIndie/EasyRelease
+          ref: ${{ inputs.kit_ref }}
+          path: .easyrelease
+          persist-credentials: false
+
+      - name: 构建
+        if: inputs.build_command != ''
+        env:
+          BUILD_COMMAND: ${{ inputs.build_command }}
+        run: bash -c "$BUILD_COMMAND"
+
+      - name: 解析产物路径
+        id: resolve
+        env:
+          ARTIFACT: ${{ inputs.artifact }}
+          APP: ${{ inputs.app }}
+        run: |
+          if [ -n "$ARTIFACT" ]; then
+            printf 'artifact=%s\n' "$ARTIFACT" >> "$GITHUB_OUTPUT"
+          else
+            printf 'artifact=apps/%s/.build/bundle/%s.app\n' "$APP" "$APP" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 签名 / 公证 / 校验
+        id: sign
+        uses: ./.easyrelease/apple
+        with:
+          artifact: ${{ steps.resolve.outputs.artifact }}
+          mode: ${{ inputs.mode }}
+          notarize: ${{ inputs.notarize }}
+          staple: ${{ inputs.staple }}
+          dry_run: ${{ inputs.dry_run }}
+          bundle_id: ${{ inputs.bundle_id }}
+          p12_base64: ${{ secrets.APPLE_P12_BASE64 }}
+          p12_password: ${{ secrets.APPLE_P12_PASSWORD }}
+          team_id: ${{ secrets.APPLE_TEAM_ID }}
+          keychain_password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          asc_key_id: ${{ secrets.ASC_KEY_ID }}
+          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+          asc_key_p8: ${{ secrets.ASC_KEY_P8 }}
+
+      - name: 上传产物与 manifest
+        if: inputs.upload_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: easyrelease-${{ inputs.app }}
+          path: |
+            ${{ steps.resolve.outputs.artifact }}
+            ${{ steps.sign.outputs.manifest_path }}
+          if-no-files-found: error
+
+      - name: 创建 GitHub Release
+        if: inputs.release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+          FILES: ${{ inputs.release_files }}
+          FALLBACK_ARTIFACT: ${{ steps.sign.outputs.signed_artifact }}
+          MANIFEST: ${{ steps.sign.outputs.manifest_path }}
+        run: |
+          set -euo pipefail
+          [ -n "$TAG" ] || { echo "::error::release=true 时 release_tag 不能为空"; exit 1; }
+
+          files=()
+          if [ -n "$FILES" ]; then
+            while IFS= read -r line; do
+              [ -n "$line" ] || continue
+              # 允许 glob;由 shell 展开
+              for f in $line; do
+                [ -e "$f" ] && files+=("$f")
+              done
+            done <<< "$FILES"
+          fi
+          if [ ${#files[@]} -eq 0 ]; then
+            files=("$FALLBACK_ARTIFACT" "$MANIFEST")
+          fi
+
+          gh release create "$TAG" "${files[@]}" --verify-tag --generate-notes

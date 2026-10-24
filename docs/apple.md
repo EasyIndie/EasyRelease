@@ -1,0 +1,126 @@
+# Apple 接入指南
+
+> ad-hoc 链路已在 macOS 27 / Xcode 27 本机验证;Developer ID 与公证链路尚未实测,见文末状态。
+
+## 1. 三种签名模式
+
+| 模式 | 证书 | 公证 | 用途 |
+|---|---|---|---|
+| `adhoc` | 不需要 | 不行 | 本机调试、CI 冒烟、验证接线 |
+| `developer-id` + `notarize=false` | 需要 | 不行 | 内部分发(仍会被 Gatekeeper 警告) |
+| `developer-id` + `notarize=true` | 需要 | 需要 | 对外分发,双击可直接打开 |
+
+## 2. 凭证准备
+
+| Secret | 内容 | 获取方式 |
+|---|---|---|
+| `APPLE_P12_BASE64` | Developer ID Application 证书 `.p12` 的 base64 | Keychain 导出后 `base64 -i cert.p12 \| pbcopy` |
+| `APPLE_P12_PASSWORD` | 导出时设置的密码 | — |
+| `APPLE_TEAM_ID` | 10 位 Team ID | Apple Developer 后台 |
+| `ASC_KEY_ID` | App Store Connect API Key ID | App Store Connect → Users and Access → Integrations |
+| `ASC_ISSUER_ID` | Issuer ID | 同上 |
+| `ASC_KEY_P8` | `AuthKey_XXX.p8` 文件内容 | 同上(只能下载一次) |
+
+建议放在 **organization secrets**,按仓库授予可见性;不要每个项目复制一份。
+
+## 3. 接入方式 A:完整流水线
+
+```yaml
+name: release
+on:
+  push:
+    tags: ["[0-9]*.[0-9]*.[0-9]*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: EasyIndie/EasyRelease/.github/workflows/apple-release.yml@apple-v0.1.0
+    with:
+      app: MyApp
+      bundle_id: com.easyindie.myapp
+      build_command: bash tools/bundle.sh --platform macOS
+      mode: developer-id
+      notarize: true
+      release: true
+      release_tag: ${{ github.ref_name }}
+    secrets: inherit
+```
+
+默认产物路径是 `apps/<app>/.build/bundle/<app>.app`;不是这个布局就显式传 `artifact`。
+
+## 4. 接入方式 B:只要签名/公证
+
+```yaml
+jobs:
+  sign:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash tools/bundle.sh
+      - uses: EasyIndie/EasyRelease/apple@apple-v0.1.0
+        id: sign
+        with:
+          artifact: .build/bundle/MyApp.app
+          mode: developer-id
+          notarize: "true"
+          entitlements: MyApp.entitlements
+          p12_base64: ${{ secrets.APPLE_P12_BASE64 }}
+          p12_password: ${{ secrets.APPLE_P12_PASSWORD }}
+          team_id: ${{ secrets.APPLE_TEAM_ID }}
+          asc_key_id: ${{ secrets.ASC_KEY_ID }}
+          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+          asc_key_p8: ${{ secrets.ASC_KEY_P8 }}
+      - run: echo "ticket=${{ steps.sign.outputs.notarization_id }}"
+```
+
+## 5. 本地复现
+
+```bash
+# ad-hoc
+EASYRELEASE_ARTIFACT=/tmp/Hello.app \
+EASYRELEASE_MODE=adhoc \
+GITHUB_WORKSPACE=/tmp \
+RUNNER_TEMP=/tmp \
+bash apple/scripts/main.sh
+```
+
+`manifest.json` 默认写到 `$GITHUB_WORKSPACE/easyrelease/`。
+
+## 6. 顺序(不要颠倒)
+
+1. 签嵌套代码(dylib / framework / xpc / appex / 内嵌 app)
+2. 签主 app(`--options runtime --timestamp`)
+3. 打 zip 提交公证(`.app` 必须先 zip;`.dmg` / `.pkg` 直接提交)
+4. 公证通过
+5. **staple 到产物本身**
+6. 再打最终分发包(zip / dmg)
+
+先打包再 staple 是最常见的错误:票据没进 bundle,离线机器仍会被拦。
+
+## 7. 排错
+
+| 症状 | 原因 | 处理 |
+|---|---|---|
+| `errSecInternalComponent` | keychain 未解锁 / 未加入搜索列表 | 检查 `security set-key-partition-list` 与 `list-keychains -s` |
+| `no identity found` | 证书不在 keychain / Team ID 不匹配 | 打印 `security find-identity -v -p codesigning` |
+| `code object is not signed at all` | 嵌套代码没先签 | 确认 frameworks / dylib 在 app 之前签 |
+| 公证 `Invalid` | 未开 hardened runtime / entitlements 不符 / 签名不完整 | `notarytool log <id>` 看具体 issue |
+| `stapler: no ticket` | 公证还没通过或 staple 错了对象 | 先确认 `status=Accepted` |
+| `spctl` 报 `source=no usable signature` | ad-hoc 模式 | 预期行为,ad-hoc 不参与 Gatekeeper |
+| 公证超时 | Apple 队列慢 | 调大 `timeout`,job `timeout-minutes` 也要大于它 |
+
+## 8. 状态
+
+| 链路 | 状态 | 验证方式 |
+|---|---|---|
+| ad-hoc `.app` | ✅ 已验证(2026-10-24) | 本机 macOS 27 / Xcode 27 + `scripts/local-selftest.sh` |
+| ad-hoc `.dmg` | ✅ 已验证(2026-10-24) | 同上 |
+| dry-run(无证书) | ✅ 已验证(2026-10-24) | 同上 + CI selftest |
+| 证书导入 / 临时 keychain 清理 | ✅ 已验证(2026-10-24) | 自签名 p12 导入后按预期报「未找到 Developer ID」,无残留 |
+| Developer ID 签名 | ⚠️ 未验证 | 需付费账号 + 证书 |
+| 公证 + staple | ⚠️ 未验证 | 需 App Store Connect API Key |
+| `.pkg` | ⚠️ 未验证 | 需 Developer ID Installer 证书 |
+
+补齐真链路后,把这里改成「已验证」并附上命令与日期。

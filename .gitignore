@@ -1,0 +1,16 @@
+.DS_Store
+.easyrelease/
+easyrelease/
+.tmp/
+
+# 证书 / 密钥:永远不要提交
+*.p12
+*.p8
+AuthKey_*.p8
+*.keychain-db
+*.mobileprovision
+*.keystore
+*.jks
+
+# 公证回执
+notary-*.json

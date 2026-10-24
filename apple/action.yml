@@ -1,0 +1,127 @@
+name: EasyRelease Apple
+description: 用 Apple 原生工具对 .app / .dmg / .pkg 做签名、公证、staple 与 Gatekeeper 校验
+author: EasyIndie
+branding:
+  icon: package
+  color: blue
+
+inputs:
+  artifact:
+    description: 待处理的 .app / .dmg / .pkg 路径
+    required: true
+  mode:
+    description: "adhoc 或 developer-id"
+    required: false
+    default: adhoc
+  notarize:
+    description: "是否提交 Apple 公证(仅 developer-id)"
+    required: false
+    default: "false"
+  staple:
+    description: "公证通过后是否 staple"
+    required: false
+    default: "true"
+  p12_base64:
+    description: "Developer ID Application 证书(.p12)的 base64"
+    required: false
+    default: ""
+  p12_password:
+    description: ".p12 密码"
+    required: false
+    default: ""
+  team_id:
+    description: "Apple Team ID,用于匹配签名身份"
+    required: false
+    default: ""
+  keychain_password:
+    description: "临时 keychain 密码;留空自动生成"
+    required: false
+    default: ""
+  asc_key_id:
+    description: "App Store Connect API Key ID"
+    required: false
+    default: ""
+  asc_issuer_id:
+    description: "App Store Connect Issuer ID"
+    required: false
+    default: ""
+  asc_key_p8:
+    description: "App Store Connect API 私钥(.p8)内容"
+    required: false
+    default: ""
+  entitlements:
+    description: "entitlements 文件路径(只作用于主 app)"
+    required: false
+    default: ""
+  bundle_id:
+    description: "Bundle ID;留空从 Info.plist 读"
+    required: false
+    default: ""
+  version:
+    description: "版本号;留空从 Info.plist 读"
+    required: false
+    default: ""
+  build_number:
+    description: "build 号;留空从 Info.plist 读"
+    required: false
+    default: ""
+  timeout:
+    description: "公证等待超时,如 30m / 1h"
+    required: false
+    default: 30m
+  dry_run:
+    description: "只校验输入并产出 manifest,不签名、不公证"
+    required: false
+    default: "false"
+  output_dir:
+    description: "manifest 输出目录;默认 $GITHUB_WORKSPACE/easyrelease"
+    required: false
+    default: ""
+  debug:
+    description: "输出调试信息(不会打印密钥)"
+    required: false
+    default: "false"
+
+outputs:
+  signed_artifact:
+    description: 处理后的产物绝对路径
+    value: ${{ steps.release.outputs.signed_artifact }}
+  sha256:
+    description: 处理后产物的 SHA-256
+    value: ${{ steps.release.outputs.sha256 }}
+  manifest_path:
+    description: manifest.json 路径
+    value: ${{ steps.release.outputs.manifest_path }}
+  notarization_id:
+    description: notarytool submission id(未公证为空)
+    value: ${{ steps.release.outputs.notarization_id }}
+  verified:
+    description: codesign / Gatekeeper 校验是否通过
+    value: ${{ steps.release.outputs.verified }}
+
+runs:
+  using: composite
+  steps:
+    - id: release
+      shell: bash
+      env:
+        EASYRELEASE_ARTIFACT: ${{ inputs.artifact }}
+        EASYRELEASE_MODE: ${{ inputs.mode }}
+        EASYRELEASE_NOTARIZE: ${{ inputs.notarize }}
+        EASYRELEASE_STAPLE: ${{ inputs.staple }}
+        EASYRELEASE_P12_BASE64: ${{ inputs.p12_base64 }}
+        EASYRELEASE_P12_PASSWORD: ${{ inputs.p12_password }}
+        EASYRELEASE_TEAM_ID: ${{ inputs.team_id }}
+        EASYRELEASE_KEYCHAIN_PASSWORD: ${{ inputs.keychain_password }}
+        EASYRELEASE_ASC_KEY_ID: ${{ inputs.asc_key_id }}
+        EASYRELEASE_ASC_ISSUER_ID: ${{ inputs.asc_issuer_id }}
+        EASYRELEASE_ASC_KEY_P8: ${{ inputs.asc_key_p8 }}
+        EASYRELEASE_ENTITLEMENTS: ${{ inputs.entitlements }}
+        EASYRELEASE_BUNDLE_ID: ${{ inputs.bundle_id }}
+        EASYRELEASE_VERSION: ${{ inputs.version }}
+        EASYRELEASE_BUILD_NUMBER: ${{ inputs.build_number }}
+        EASYRELEASE_TIMEOUT: ${{ inputs.timeout }}
+        EASYRELEASE_DRY_RUN: ${{ inputs.dry_run }}
+        EASYRELEASE_OUTPUT_DIR: ${{ inputs.output_dir }}
+        EASYRELEASE_DEBUG: ${{ inputs.debug }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/main.sh"
