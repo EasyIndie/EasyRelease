@@ -171,3 +171,11 @@ reusable workflow 全链路(构建 → 签名 → 公证 → 上传)也验证通
 - Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40097027827>
 - notarization:`6229b65c-de5c-4667-be8d-30b33f63bf63`(`status=Accepted`)
 - `spctl`:`accepted` / `source=Notarized Developer ID`
+
+EasyApple 正式 `release.yml` dry-run(构建 → 公证 → zip + sha256,不建 Release):
+
+- Run:<https://github.com/EasyIndie/EasyApple/actions/runs/40098005804>
+- notarization:`dc014cc6-8704-4c6f-b1e7-c17715b14234`(`status=Accepted`)
+- 下载 zip 后用 `ditto -x -k` 解压,重新校验:`codesign` 通过、`Notarization Ticket=stapled`、
+  `stapler validate` 通过、`spctl` `accepted` / `source=Notarized Developer ID`
+- `.sha256` 校验通过

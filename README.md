@@ -17,6 +17,7 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | 公证 + staple | ✅ 已验证(同上,submission `78a6fd71-1b0c-49c4-acf7-68e0e33f29af`) |
 | reusable workflow 全链路 | ✅ 已验证(2026-10-24,run [40096049639](https://github.com/EasyIndie/EasyApple/actions/runs/40096049639)) |
 | reusable + `secrets: inherit` | ✅ 已验证(2026-10-24,run [40097027827](https://github.com/EasyIndie/EasyApple/actions/runs/40097027827)) |
+| EasyApple Release dry-run | ✅ 已验证(2026-10-24,run [40098005804](https://github.com/EasyIndie/EasyApple/actions/runs/40098005804)) |
 | `.pkg` 签名 | ⚠️ 未验证(需 Developer ID Installer 证书) |
 | Android 签名 | ⏳ 未实现(契约已预留) |
 
@@ -113,6 +114,7 @@ docs/
 | `apple-v0.2.0` | 支持显式 `identity`、base64 p8 |
 | `apple-v0.3.x` | 真链路验证 + 文档 |
 | `apple-v0.4.0` | reusable workflow secret 名对齐 EasyIndie 组织,支持 `secrets: inherit` |
+| `apple-v0.5.0` | 上传 artifact 改为扁平目录(`<app>.app` + `apple-manifest.json`) |
 | `apple-v0` | 浮动别名,只用于试用 |
 | `android-v0.x` | 预留,与 Apple 独立演进 |
 

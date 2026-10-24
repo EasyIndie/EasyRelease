@@ -60,6 +60,10 @@
 | `notarization_id` | `notarytool` submission id;未公证为空 |
 | `verified` | `true` / `false` |
 
+reusable workflow 在 `upload_artifact: true` 时上传**扁平** artifact:
+根目录直接是 `<app>.app` 与 `apple-manifest.json`,下游 release job 不需要解析
+`apps/...` 深路径。
+
 ## 6. manifest schema
 
 ```json
