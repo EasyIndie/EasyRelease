@@ -154,14 +154,25 @@ jobs:
           asc_issuer_id: ${{ secrets.APPLE_ASC_ISSUER_ID }}
           asc_key_p8: ${{ secrets.APPLE_ASC_API_KEY }}
 
+      - name: 整理上传目录(扁平结构)
+        if: inputs.upload_artifact
+        env:
+          ARTIFACT: ${{ steps.resolve.outputs.artifact }}
+          MANIFEST: ${{ steps.sign.outputs.manifest_path }}
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/easyrelease-upload"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          ditto "$ARTIFACT" "$stage/$(basename "$ARTIFACT")"
+          cp "$MANIFEST" "$stage/apple-manifest.json"
+
       - name: 上传产物与 manifest
         if: inputs.upload_artifact
         uses: actions/upload-artifact@v4
         with:
           name: easyrelease-${{ inputs.app }}
-          path: |
-            ${{ steps.resolve.outputs.artifact }}
-            ${{ steps.sign.outputs.manifest_path }}
+          path: ${{ runner.temp }}/easyrelease-upload
           if-no-files-found: error
 
       - name: 创建 GitHub Release
