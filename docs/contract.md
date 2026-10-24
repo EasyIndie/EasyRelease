@@ -24,7 +24,7 @@
 
 | 输入 | 必填 | 默认 | 说明 |
 |---|---|---|---|
-| `artifact` | ✅ | — | `.app` / `.dmg` / `.pkg` 路径 |
+| `artifact` | ✅ | — | `.app` / `.dmg` / `.pkg` / `.zip` 路径 |
 | `mode` | | `adhoc` | `adhoc` 或 `developer-id` |
 | `notarize` | | `false` | 仅 `developer-id` 可用 |
 | `staple` | | `true` | 公证通过后自动 staple |
@@ -45,11 +45,20 @@
 | `team_id` | 按 Team ID 匹配签名身份 | 建议填 |
 | `identity` | 完整签名身份(名称或 SHA-1) | 留空则用 `team_id` 匹配 |
 | `keychain_password` | 临时 keychain 密码 | 留空自动生成 |
-| `asc_key_id` | App Store Connect API Key ID | `notarize=true` |
-| `asc_issuer_id` | App Store Connect Issuer ID | `notarize=true` |
-| `asc_key_p8` | API 私钥内容(PEM 或 base64) | `notarize=true` |
+| `notary_auth` | `auto` / `api-key` / `apple-id` | 默认 `auto` |
+| `apple_id` | Apple ID | `notary_auth=apple-id` |
+| `apple_password` | App 专用密码 | `notary_auth=apple-id` |
+| `asc_key_id` | App Store Connect API Key ID | `notary_auth=api-key` |
+| `asc_issuer_id` | App Store Connect Issuer ID | `notary_auth=api-key` |
+| `asc_key_p8` | API 私钥内容(PEM 或 base64) | `notary_auth=api-key` |
 | `entitlements` | hardened runtime 权限文件 | 按需 |
 | `timeout` | 公证等待超时,默认 `30m` | 按需 |
+
+### zip 输入
+
+`.zip` 必须**恰好包含一个** `.app` / `.dmg` / `.pkg`;嵌套在子目录里也可以。
+处理流程:解包 → 签名/公证/staple 内层 → 重新打包为 `<name>-signed.zip` → 再解压校验。
+manifest 会记录 `container=zip`、`inner_artifact`、`inner_kind`。
 
 ## 5. 输出
 
@@ -60,6 +69,8 @@
 | `manifest_path` | `manifest.json` 路径 |
 | `notarization_id` | `notarytool` submission id;未公证为空 |
 | `verified` | `true` / `false` |
+
+zip 输入时 `signed_artifact` 指向新生成的 `<name>-signed.zip`。
 
 reusable workflow 在 `upload_artifact: true` 时上传**扁平** artifact:
 根目录直接是 `<app>.app` 与 `apple-manifest.json`,下游 release job 不需要解析
@@ -74,6 +85,10 @@ reusable workflow 在 `upload_artifact: true` 时上传**扁平** artifact:
   "status": "ok",
   "artifact": "/abs/path/MyApp.app",
   "artifact_kind": "app",
+  "container": "",
+  "inner_artifact": "",
+  "inner_kind": "app",
+  "input_artifact": "/abs/path/MyApp.app",
   "bundle_id": "com.easyindie.myapp",
   "version": "1.2.0",
   "build": "10200",
@@ -84,6 +99,7 @@ reusable workflow 在 `upload_artifact: true` 时上传**扁平** artifact:
   "stapled": true,
   "gatekeeper": "accepted",
   "verified": true,
+  "notary_auth": "api-key",
   "notarization_id": "…",
   "sha256_before": "…",
   "sha256": "…",

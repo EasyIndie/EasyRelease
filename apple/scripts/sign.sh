@@ -7,7 +7,8 @@ easyrelease_artifact_kind() {
     *.app) printf 'app' ;;
     *.dmg) printf 'dmg' ;;
     *.pkg) printf 'pkg' ;;
-    *) die "不支持的产物类型:$1(只支持 .app / .dmg / .pkg)" ;;
+    *.zip) printf 'zip' ;;
+    *) die "不支持的产物类型:$1(只支持 .app / .dmg / .pkg / .zip)" ;;
   esac
 }
 
@@ -46,6 +47,7 @@ easyrelease_sign() {
   local entitlements="${4:-}"
   local kind
   kind="$(easyrelease_artifact_kind "$artifact")"
+  [ "$kind" != "zip" ] || die "zip 需要先解包再签名"
 
   if [ "$mode" = "adhoc" ]; then
     case "$kind" in

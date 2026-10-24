@@ -41,6 +41,18 @@ inputs:
     description: "临时 keychain 密码;留空自动生成"
     required: false
     default: ""
+  notary_auth:
+    description: "公证认证方式:auto / api-key / apple-id"
+    required: false
+    default: auto
+  apple_id:
+    description: "Apple ID(仅 apple-id 认证)"
+    required: false
+    default: ""
+  apple_password:
+    description: "App 专用密码(仅 apple-id 认证)"
+    required: false
+    default: ""
   asc_key_id:
     description: "App Store Connect API Key ID"
     required: false
@@ -118,6 +130,9 @@ runs:
         EASYRELEASE_TEAM_ID: ${{ inputs.team_id }}
         EASYRELEASE_IDENTITY: ${{ inputs.identity }}
         EASYRELEASE_KEYCHAIN_PASSWORD: ${{ inputs.keychain_password }}
+        EASYRELEASE_NOTARY_AUTH: ${{ inputs.notary_auth }}
+        EASYRELEASE_APPLE_ID: ${{ inputs.apple_id }}
+        EASYRELEASE_APPLE_PASSWORD: ${{ inputs.apple_password }}
         EASYRELEASE_ASC_KEY_ID: ${{ inputs.asc_key_id }}
         EASYRELEASE_ASC_ISSUER_ID: ${{ inputs.asc_issuer_id }}
         EASYRELEASE_ASC_KEY_P8: ${{ inputs.asc_key_p8 }}

@@ -89,6 +89,72 @@ else
   bad "dry-run 执行失败"
 fi
 
+
+echo "== adhoc .zip(内含 .app)=="
+ZIP_APP="$TMP/Hello.zip"
+ditto -c -k --keepParent "$APP" "$ZIP_APP"
+OUT4="$TMP/zip-app.txt"
+if run_action "$OUT4" EASYRELEASE_ARTIFACT="$ZIP_APP" EASYRELEASE_MODE=adhoc >/dev/null; then
+  M4="$(sed -n 's/^manifest_path=//p' "$OUT4")"
+  plutil -extract artifact_kind raw -o - "$M4" | grep -qx zip && ok "artifact_kind=zip" || bad "zip kind"
+  plutil -extract inner_kind raw -o - "$M4" | grep -qx app && ok "inner_kind=app" || bad "zip inner kind"
+  SIGNED4="$(sed -n 's/^signed_artifact=//p' "$OUT4")"
+  [ -f "$SIGNED4" ] && ok "输出 zip 存在" || bad "输出 zip 缺失"
+  rm -rf "$TMP/unzip-app" && mkdir -p "$TMP/unzip-app"
+  ditto -x -k "$SIGNED4" "$TMP/unzip-app"
+  codesign --verify --deep --strict "$TMP/unzip-app/Hello.app" && ok "解压后 codesign 校验" || bad "解压后 codesign"
+else
+  bad "zip(app) 执行失败"
+fi
+
+echo "== adhoc .zip(内含 .dmg)=="
+ZIP_DMG="$TMP/HelloDMG.zip"
+( cd "$TMP" && ditto -c -k "Hello.dmg" "HelloDMG.zip" )
+OUT5="$TMP/zip-dmg.txt"
+if run_action "$OUT5" EASYRELEASE_ARTIFACT="$ZIP_DMG" EASYRELEASE_MODE=adhoc >/dev/null; then
+  M5="$(sed -n 's/^manifest_path=//p' "$OUT5")"
+  plutil -extract inner_kind raw -o - "$M5" | grep -qx dmg && ok "inner_kind=dmg" || bad "zip dmg inner kind"
+  SIGNED5="$(sed -n 's/^signed_artifact=//p' "$OUT5")"
+  rm -rf "$TMP/unzip-dmg" && mkdir -p "$TMP/unzip-dmg"
+  ditto -x -k "$SIGNED5" "$TMP/unzip-dmg"
+  codesign --verify --deep --strict "$TMP/unzip-dmg/Hello.dmg" && ok "解压后 dmg codesign 校验" || bad "解压后 dmg codesign"
+else
+  bad "zip(dmg) 执行失败"
+fi
+
+echo "== 公证认证方式(dry-run)=="
+OUT6="$TMP/auth-apple-id.txt"
+if run_action "$OUT6" \
+  EASYRELEASE_ARTIFACT="$APP" \
+  EASYRELEASE_MODE=developer-id \
+  EASYRELEASE_NOTARIZE=true \
+  EASYRELEASE_DRY_RUN=true \
+  EASYRELEASE_NOTARY_AUTH=apple-id \
+  EASYRELEASE_APPLE_ID=test@example.com \
+  EASYRELEASE_APPLE_PASSWORD=app-specific-pass \
+  EASYRELEASE_TEAM_ID=ABCDE12345 >/dev/null; then
+  M6="$(sed -n 's/^manifest_path=//p' "$OUT6")"
+  plutil -extract notary_auth raw -o - "$M6" | grep -qx apple-id && ok "notary_auth=apple-id" || bad "apple-id auth"
+else
+  bad "apple-id dry-run 执行失败"
+fi
+
+OUT7="$TMP/auth-api-key.txt"
+if run_action "$OUT7" \
+  EASYRELEASE_ARTIFACT="$APP" \
+  EASYRELEASE_MODE=developer-id \
+  EASYRELEASE_NOTARIZE=true \
+  EASYRELEASE_DRY_RUN=true \
+  EASYRELEASE_NOTARY_AUTH=auto \
+  EASYRELEASE_ASC_KEY_ID=KEYID \
+  EASYRELEASE_ASC_ISSUER_ID=ISSUER \
+  EASYRELEASE_ASC_KEY_P8=dummy >/dev/null; then
+  M7="$(sed -n 's/^manifest_path=//p' "$OUT7")"
+  plutil -extract notary_auth raw -o - "$M7" | grep -qx api-key && ok "auto -> api-key" || bad "auto auth"
+else
+  bad "api-key dry-run 执行失败"
+fi
+
 echo "== 失败路径 =="
 if run_action "$TMP/missing.txt" EASYRELEASE_ARTIFACT="$TMP/nope.app" EASYRELEASE_MODE=adhoc >/dev/null 2>&1; then
   bad "缺产物应失败"
@@ -106,6 +172,17 @@ if run_action "$TMP/no-cert.txt" EASYRELEASE_ARTIFACT="$APP" EASYRELEASE_MODE=de
   bad "developer-id 缺证书应失败"
 else
   ok "developer-id 缺证书按预期失败"
+fi
+
+MULTI_STAGE="$TMP/multi"
+mkdir -p "$MULTI_STAGE"
+ditto "$APP" "$MULTI_STAGE/Hello.app"
+ditto "$DMG" "$MULTI_STAGE/Hello.dmg"
+ditto -c -k "$MULTI_STAGE" "$TMP/Hello-multi.zip"
+if run_action "$TMP/multi.txt" EASYRELEASE_ARTIFACT="$TMP/Hello-multi.zip" EASYRELEASE_MODE=adhoc >/dev/null 2>&1; then
+  bad "zip 多产物应失败"
+else
+  ok "zip 多产物按预期失败"
 fi
 
 echo ""
