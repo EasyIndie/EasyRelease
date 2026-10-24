@@ -65,6 +65,10 @@ openssl base64 -A -in installer.p12 > installer.p12.b64
 
 ## 5. 构建 pkg
 
+> **pkg 内的 app 必须先签 Developer ID Application(带 hardened runtime + timestamp),
+> 再用 pkgbuild 打包;否则公证会报「binary is not signed with a valid Developer ID /
+> no secure timestamp / hardened runtime disabled」。**
+
 EasyRelease 只做签名/公证,不负责构建。最小示例:
 
 ```bash
