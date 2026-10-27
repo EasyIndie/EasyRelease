@@ -245,8 +245,9 @@ jobs:
           cp "$MANIFEST" "$out/$APP-$TAG-manifest.json"
           files+=("$out/$APP-$TAG-manifest.json")
           for f in "${files[@]}"; do
-            shasum -a 256 "$f" > "$f.sha256"
-            printf '%s\n' "$f" "$f.sha256" >> "$out/release-files.txt"
+            filename="$(basename "$f")"
+            (cd "$out" && shasum -a 256 "$filename" > "$filename.sha256")
+            printf '%s\n' "$out/$filename" "$out/$filename.sha256" >> "$out/release-files.txt"
           done
           cat "$out/release-files.txt"
 
