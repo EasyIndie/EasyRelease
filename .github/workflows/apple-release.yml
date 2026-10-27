@@ -37,6 +37,11 @@ on:
         type: string
         required: false
         default: ""
+      entitlements:
+        description: "传给 Developer ID 签名的 entitlements 文件路径"
+        type: string
+        required: false
+        default: ""
       identity:
         description: "完整签名身份;留空按 team_id 查找"
         type: string
@@ -178,6 +183,7 @@ jobs:
           bundle_id: ${{ inputs.bundle_id }}
           version: ${{ inputs.version }}
           build_number: ${{ inputs.build_number }}
+          entitlements: ${{ inputs.entitlements }}
           p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
           p12_password: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
           team_id: ${{ secrets.APPLE_TEAM_ID }}
