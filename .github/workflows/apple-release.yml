@@ -27,6 +27,16 @@ on:
         type: string
         required: false
         default: ""
+      version:
+        description: "应用版本号;用于 manifest"
+        type: string
+        required: false
+        default: ""
+      build_number:
+        description: "应用 build 号;用于 manifest"
+        type: string
+        required: false
+        default: ""
       identity:
         description: "完整签名身份;留空按 team_id 查找"
         type: string
@@ -166,6 +176,8 @@ jobs:
           staple: ${{ inputs.staple }}
           dry_run: ${{ inputs.dry_run }}
           bundle_id: ${{ inputs.bundle_id }}
+          version: ${{ inputs.version }}
+          build_number: ${{ inputs.build_number }}
           p12_base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
           p12_password: ${{ secrets.APPLE_CERTIFICATE_P12_PASSWORD }}
           team_id: ${{ secrets.APPLE_TEAM_ID }}
