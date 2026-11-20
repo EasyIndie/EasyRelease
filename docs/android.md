@@ -76,6 +76,19 @@ base64 -i keystore/release.jks | tr -d '\n'         # macOS
 **没有 `ANDROID_KEYSTORE_BASE64` 时不会报错**,只打一条 warning 并跳过还原 ——
 适用于「产物已经签好、只需要校验」的场景。
 
+> ⚠️ **跨 owner 调用时不要用 `secrets: inherit`。** 实测(2026-11-20,
+> 调用方 `OrzGeeker/*`、本仓库 `EasyIndie/EasyRelease`)`inherit` 传过去是**空的**,
+> 而且不报错 —— 构建拿不到 keystore,静默产出未签名包,失败一路延后到校验步骤。
+> 生产请逐项显式映射:
+>
+> ```yaml
+>     secrets:
+>       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+>       ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+>       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+>       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+> ```
+
 ## 3. 方式 B:单步 action
 
 ```yaml
@@ -153,3 +166,5 @@ ANDROID_HOME=/opt/android-sdk bash scripts/local-selftest-android.sh
 | `签名指纹 … 不在期望列表里` | 换了密钥,或 secrets 指到了另一把 keystore |
 | `keystore 打不开或别名 … 不存在` | base64 截断、`ANDROID_KEY_ALIAS` 写错,或 PKCS12 的 key 密码与 store 密码不一致 |
 | `versionName 不符` | tag 与产物版本对不上;用 `version_file` 提前拦住更省事 |
+| run 直接 `startup_failure`(只有「workflow file issue」) | 调用方 job 的 `permissions` 比被调 workflow 声明的窄。它声明 `contents: write`,调用方必须给 write(只允许降权) |
+| 四个密钥在日志里都是空、构建产物是 `app-release-unsigned.apk` | `secrets: inherit` 跨 owner 没生效;改成逐项显式映射 |
