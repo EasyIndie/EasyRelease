@@ -1,0 +1,116 @@
+name: EasyRelease Android
+description: 用 Android 原生工具校验 APK / AAB(清单、版本、签名指纹、ABI、Bundle 结构)并产出 manifest
+author: EasyIndie
+branding:
+  icon: package
+  color: green
+
+inputs:
+  apk:
+    description: 待校验的 .apk 路径(与 aab 至少给一个)
+    required: false
+    default: ""
+  aab:
+    description: 待校验的 .aab 路径(与 apk 至少给一个)
+    required: false
+    default: ""
+  expected_package:
+    description: 期望的 applicationId;留空不校验
+    required: false
+    default: ""
+  expected_version_name:
+    description: 期望的 versionName;留空不校验
+    required: false
+    default: ""
+  expected_version_code:
+    description: 期望的 versionCode;留空不校验
+    required: false
+    default: ""
+  expected_sha256:
+    description: 期望的签名证书 SHA-256,多个用逗号分隔;留空只要求「有签名」
+    required: false
+    default: ""
+  forbidden_strings:
+    description: 产物里不允许出现的字符串,逗号分隔(例如 debug 钩子的广播 action)
+    required: false
+    default: ""
+  require_abis:
+    description: 必须包含的 ABI,逗号分隔;留空不校验
+    required: false
+    default: arm64-v8a
+  min_target_sdk:
+    description: targetSdk 下限;留空不校验(Play / 国内商店门槛由调用方决定)
+    required: false
+    default: ""
+  build_tools:
+    description: 显式指定 Android build-tools 目录;留空从 ANDROID_HOME 里挑最高版本
+    required: false
+    default: ""
+  dry_run:
+    description: 只产出 manifest,不因校验失败而中断
+    required: false
+    default: "false"
+  output_dir:
+    description: manifest 输出目录;默认 $GITHUB_WORKSPACE/easyrelease
+    required: false
+    default: ""
+  debug:
+    description: 输出调试信息(不会打印密钥)
+    required: false
+    default: "false"
+
+outputs:
+  artifact:
+    description: 主产物绝对路径(有 APK 时指向 APK,否则 AAB)
+    value: ${{ steps.verify.outputs.artifact }}
+  apk:
+    description: APK 绝对路径
+    value: ${{ steps.verify.outputs.apk }}
+  aab:
+    description: AAB 绝对路径
+    value: ${{ steps.verify.outputs.aab }}
+  sha256:
+    description: APK(或主产物)的 SHA-256
+    value: ${{ steps.verify.outputs.sha256 }}
+  sha256_aab:
+    description: AAB 的 SHA-256
+    value: ${{ steps.verify.outputs.sha256_aab }}
+  manifest_path:
+    description: android-manifest.json 路径
+    value: ${{ steps.verify.outputs.manifest_path }}
+  package:
+    description: 从产物读到的 applicationId
+    value: ${{ steps.verify.outputs.package }}
+  version_name:
+    description: 从产物读到的 versionName
+    value: ${{ steps.verify.outputs.version_name }}
+  version_code:
+    description: 从产物读到的 versionCode
+    value: ${{ steps.verify.outputs.version_code }}
+  certificate_sha256:
+    description: 签名证书 SHA-256(小写十六进制)
+    value: ${{ steps.verify.outputs.certificate_sha256 }}
+  verified:
+    description: 校验是否全部通过
+    value: ${{ steps.verify.outputs.verified }}
+
+runs:
+  using: composite
+  steps:
+    - id: verify
+      shell: bash
+      env:
+        EASYRELEASE_APK: ${{ inputs.apk }}
+        EASYRELEASE_AAB: ${{ inputs.aab }}
+        EASYRELEASE_EXPECTED_PACKAGE: ${{ inputs.expected_package }}
+        EASYRELEASE_EXPECTED_VERSION_NAME: ${{ inputs.expected_version_name }}
+        EASYRELEASE_EXPECTED_VERSION_CODE: ${{ inputs.expected_version_code }}
+        EASYRELEASE_EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+        EASYRELEASE_FORBIDDEN_STRINGS: ${{ inputs.forbidden_strings }}
+        EASYRELEASE_REQUIRE_ABIS: ${{ inputs.require_abis }}
+        EASYRELEASE_MIN_TARGET_SDK: ${{ inputs.min_target_sdk }}
+        EASYRELEASE_BUILD_TOOLS: ${{ inputs.build_tools }}
+        EASYRELEASE_DRY_RUN: ${{ inputs.dry_run }}
+        EASYRELEASE_OUTPUT_DIR: ${{ inputs.output_dir }}
+        EASYRELEASE_DEBUG: ${{ inputs.debug }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/main.sh"

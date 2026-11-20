@@ -20,6 +20,8 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | API Key / Apple ID + 专用密码 | ✅ |
 | reusable workflow / `secrets: inherit` | ✅ |
 | `release.yml` dry-run | ✅ |
+| **Android 校验**(APK/AAB:包名 / 版本 / 签名指纹 / ABI / Bundle 结构) | ✅ 21 项自测 |
+| Android `mode=sign`(构建产物未签名时事后签) | ⏳ `android-v0.2.0` |
 
 > run、公证 ID、复现命令与未覆盖项统一见 [docs/verification.md](docs/verification.md)。
 > 证书到期与轮换见 [docs/credentials.md](docs/credentials.md) 第 9 节;
@@ -58,6 +60,34 @@ jobs:
 单步签名/公证、ad-hoc、`.zip` / `.dmg` / `.pkg` 的用法见
 [docs/apple.md](docs/apple.md)。
 
+### 方式 B:Android(校验 + 发布;签名在构建期完成)
+
+```yaml
+jobs:
+  release:
+    permissions:
+      contents: write
+    uses: EasyIndie/EasyRelease/.github/workflows/android-release.yml@android-v0.1.0
+    with:
+      app: MyApp
+      package_name: com.example.myapp
+      tag_prefix: android-v
+      version_file: app/version.properties
+      apk: app/build/outputs/apk/release/app-release.apk
+      aab: app/build/outputs/bundle/release/app-release.aab
+      build_command: ./gradlew :app:assembleRelease :app:bundleRelease
+      keystore_properties: keystore.properties   # storeFile 用相对路径
+      forbidden_strings: UiDumpReceiver          # debug 钩子的广播 action
+      min_target_sdk: 36
+      release: true
+      release_tag: ${{ github.ref_name }}
+    secrets: inherit
+```
+
+`android-v0.1.0` **只校验不签名** —— 签名在构建期由 Gradle 完成(密钥由本仓库在
+构建前还原),事后重签会破坏 v2/v3 签名链与 Play 的 upload key。
+校验项、凭证与排错见 [docs/android.md](docs/android.md)。
+
 ## 本地自测(不需要证书)
 
 ```bash
@@ -68,18 +98,31 @@ bash scripts/local-selftest.sh
 组合错误、缺证书等失败路径。2026-10-24 在本机(macOS 27.0.1 / Xcode 27.0)
 **22 项全通过**。
 
+Android 侧同样不需要发布证书:
+
+```bash
+ANDROID_HOME=/opt/android-sdk bash scripts/local-selftest-android.sh
+```
+
+用 `keytool` 现生成临时 keystore、用 `aapt2` 现造 fixture APK / AAB,覆盖正例、
+禁词、指纹不符、debuggable、缺 ABI、dry-run、密钥还原与失败路径。
+**21 项全通过**(WSL2 / build-tools 36.0.0 / JDK 17)。
+
 ## 目录
 
 ```
 apple/                Apple 平台 composite action + 原生脚本
+android/              Android 平台 composite action(校验 + manifest)
 lib/                  共享 shell 函数
 scripts/              本地自测 + 证书健康检查
 .github/workflows/
   apple-release.yml   完整流水线(workflow_call)
-  selftest.yml        无证书自测(adhoc + dry-run)
+  android-release.yml Android 流水线:还原密钥 → 构建 → 校验 → 发布
+  selftest.yml        无证书自测(adhoc / dry-run / Android fixture)
 docs/
   contract.md         输入/输出/manifest 契约
   apple.md            Apple 接入、凭证与排错
+  android.md          Android 接入、校验项与排错
 ```
 
 > Runner 标签默认 `xcode-27`(含 Xcode 27)。如果你的组织用 `macos-26` 或自托管,
@@ -101,7 +144,8 @@ docs/
 | `apple-v0.6.3` | 签名身份查找支持 `Developer ID Installer`(`.pkg`) |
 | `apple-v0.6.4` | 修复 `.pkg` 的 `productsign` 无头卡住;`.pkg` 真链路验证通过 |
 | `apple-v0` | 浮动别名,只用于试用 |
-| `android-v0.x` | 预留,与 Apple 独立演进 |
+| `android-v0.1.0` | Android 首个版本:**只校验不签名**(APK/AAB + manifest) |
+| `android-v0` | 浮动别名,只用于试用 |
 
 生产建议 pin 精确 tag 或 commit SHA,不要 `@main`。
 
@@ -112,6 +156,7 @@ docs/
 - [docs/contract.md](docs/contract.md):EasyRelease 输入、输出、manifest、版本策略
 - [docs/apple.md](docs/apple.md):Apple 接入、使用方式与排错
 - [docs/pkg.md](docs/pkg.md):`.pkg` 构建、签名、公证与验证
+- [docs/android.md](docs/android.md):**Android 接入、校验项、凭证与排错**
 
 ## 与 EasyApple 的关系
 

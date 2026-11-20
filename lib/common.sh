@@ -77,3 +77,13 @@ easyrelease_cleanup_temp() {
   fi
   EASYRELEASE_TEMP_FILES=()
 }
+
+# 单文件 SHA-256。Linux 优先 sha256sum,BSD/macOS 只有 shasum。
+# 与 sha256_of 的区别:只处理文件,不做目录树哈希(Android 产物都是单文件)。
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
