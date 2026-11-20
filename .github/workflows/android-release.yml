@@ -1,0 +1,367 @@
+name: Android Release
+
+# Android 发布流水线(reusable):还原签名密钥 → 构建(调用方命令)→ 校验产物 → 发布。
+#
+# 与 Apple 侧的分工一致:**构建留在业务仓库**(build_command),这里只做
+# 密钥还原、产物校验、manifest、资产打包与 Release 上传。
+#
+# 用法:
+#   jobs:
+#     release:
+#       uses: EasyIndie/EasyRelease/.github/workflows/android-release.yml@android-v0.1.0
+#       with:
+#         app: MyApp
+#         build_command: ./gradlew :app:assembleRelease :app:bundleRelease
+#         apk: app/build/outputs/apk/release/app-release.apk
+#         aab: app/build/outputs/bundle/release/app-release.aab
+#         package_name: com.example.myapp
+#         tag_prefix: android-v
+#         release: true
+#         release_tag: ${{ github.ref_name }}
+#       secrets: inherit
+
+on:
+  workflow_call:
+    inputs:
+      runs_on:
+        description: "runner 标签;默认 ubuntu-24.04(需要 Android SDK 的 build-tools)"
+        type: string
+        required: false
+        default: ubuntu-24.04
+      kit_ref:
+        description: "EasyRelease 的 ref(tag / SHA);生产建议 pin SHA"
+        type: string
+        required: false
+        default: android-v0
+      checkout_ref:
+        description: "检出业务仓库的 ref;留空用事件 ref"
+        type: string
+        required: false
+        default: ""
+      app:
+        description: "应用名,用于产物命名"
+        type: string
+        required: true
+      package_name:
+        description: "期望的 applicationId;留空不校验"
+        type: string
+        required: false
+        default: ""
+      version:
+        description: "版本号;留空按 tag_prefix 从 ref_name 推导"
+        type: string
+        required: false
+        default: ""
+      version_code:
+        description: "期望的 versionCode;留空不校验"
+        type: string
+        required: false
+        default: ""
+      tag_prefix:
+        description: "从 GITHUB_REF_NAME 里剥掉的 tag 前缀,例如 android-v"
+        type: string
+        required: false
+        default: ""
+      version_file:
+        description: "可选:校验版本一致性的文件(如 version.properties);留空跳过"
+        type: string
+        required: false
+        default: ""
+      version_file_key:
+        description: "version_file 里的键名"
+        type: string
+        required: false
+        default: version
+      apk:
+        description: "APK 路径;留空表示不产出 APK"
+        type: string
+        required: false
+        default: ""
+      aab:
+        description: "AAB 路径;留空表示不产出 AAB"
+        type: string
+        required: false
+        default: ""
+      build_command:
+        description: "构建命令;留空表示产物已存在"
+        type: string
+        required: false
+        default: ""
+      java_version:
+        description: "构建与签名用的 JDK 版本"
+        type: string
+        required: false
+        default: "17"
+      build_tools:
+        description: "Android build-tools 目录;留空从 SDK 里挑最高版本"
+        type: string
+        required: false
+        default: ""
+      keystore_path:
+        description: "还原出来的 .jks 落盘路径;留空放 $RUNNER_TEMP/easyrelease-android/"
+        type: string
+        required: false
+        default: ""
+      keystore_properties:
+        description: "可选:顺手写一份 keystore.properties(storeFile 用相对路径)"
+        type: string
+        required: false
+        default: ""
+      alias_property:
+        description: "keystore.properties 里别名的键名(如 alias.MyApp)"
+        type: string
+        required: false
+        default: keyAlias
+      forbidden_strings:
+        description: "产物里不允许出现的字符串,逗号分隔(如 debug 钩子的广播 action)"
+        type: string
+        required: false
+        default: ""
+      require_abis:
+        description: "必须包含的 ABI,逗号分隔"
+        type: string
+        required: false
+        default: arm64-v8a
+      min_target_sdk:
+        description: "targetSdk 下限;留空不校验"
+        type: string
+        required: false
+        default: ""
+      upload_artifact:
+        description: "是否上传产物与 manifest"
+        type: boolean
+        required: false
+        default: true
+      release:
+        description: "是否创建 GitHub Release"
+        type: boolean
+        required: false
+        default: false
+      release_tag:
+        description: "Release tag(必须已存在);留空用 GITHUB_REF_NAME"
+        type: string
+        required: false
+        default: ""
+      release_files:
+        description: "额外发布文件,每行一个 glob;留空则用产物 + manifest"
+        type: string
+        required: false
+        default: ""
+      dry_run:
+        description: "只校验并产出 manifest,不创建 Release"
+        type: boolean
+        required: false
+        default: false
+    # 名称与 EasyIndie 组织 secret 一致,调用方可直接 secrets: inherit。
+    secrets:
+      ANDROID_KEYSTORE_BASE64:
+        required: false
+      ANDROID_STORE_PASSWORD:
+        required: false
+      ANDROID_KEY_PASSWORD:
+        required: false
+      ANDROID_KEY_ALIAS:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ${{ inputs.runs_on }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出业务仓库
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      - name: 检出 EasyRelease
+        uses: actions/checkout@v4
+        with:
+          repository: EasyIndie/EasyRelease
+          ref: ${{ inputs.kit_ref }}
+          path: .easyrelease
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java_version }}
+          cache: gradle
+
+      - name: 解析版本
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          TAG_PREFIX: ${{ inputs.tag_prefix }}
+          VERSION_FILE: ${{ inputs.version_file }}
+          VERSION_FILE_KEY: ${{ inputs.version_file_key }}
+        run: |
+          set -euo pipefail
+          ver="$INPUT_VERSION"
+          if [ -z "$ver" ]; then
+            ref="${GITHUB_REF_NAME}"
+            case "$ref" in
+              "$TAG_PREFIX"*) ver="${ref#"$TAG_PREFIX"}" ;;
+              *) ver="$ref" ;;
+            esac
+          fi
+          printf 'version=%s\n' "$ver" >> "$GITHUB_OUTPUT"
+          echo "版本:$ver"
+          if [ -n "$VERSION_FILE" ]; then
+            [ -f "$VERSION_FILE" ] || { echo "::error::$VERSION_FILE 不存在"; exit 1; }
+            file_ver="$(sed -n "s/^[[:space:]]*${VERSION_FILE_KEY}[[:space:]]*=[[:space:]]*//p" "$VERSION_FILE" | tr -d '[:space:]' | head -1)"
+            echo "$VERSION_FILE: $VERSION_FILE_KEY=$file_ver"
+            [ "$ver" = "$file_ver" ] || { echo "::error::版本不一致:tag 推出 $ver,$VERSION_FILE 是 $file_ver"; exit 1; }
+          fi
+
+      # 不能用 `if: secrets.X != ''` —— GitHub 的表达式上下文里没有 secrets。
+      # 所以这一步总是跑,内部自己判断:没给 base64 就跳过(产物已签名的场景)。
+      - name: 还原签名密钥
+        env:
+          EASYRELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          EASYRELEASE_KEYSTORE_PATH: ${{ inputs.keystore_path }}
+          EASYRELEASE_KEYSTORE_PROPERTIES: ${{ inputs.keystore_properties }}
+          EASYRELEASE_ALIAS_PROPERTY: ${{ inputs.alias_property }}
+          EASYRELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          EASYRELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          EASYRELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          DEFAULT_DIR: ${{ runner.temp }}/easyrelease-android
+        run: |
+          set -euo pipefail
+          if [ -z "${EASYRELEASE_KEYSTORE_BASE64:-}" ]; then
+            echo "::warning::没有 ANDROID_KEYSTORE_BASE64,跳过密钥还原(仅适用于产物已签名的场景)"
+            exit 0
+          fi
+          export RUNNER_TEMP="${RUNNER_TEMP:-$DEFAULT_DIR}"
+          if [ -z "$EASYRELEASE_KEYSTORE_PATH" ]; then
+            export EASYRELEASE_KEYSTORE_PATH="$DEFAULT_DIR/release.jks"
+          fi
+          bash .easyrelease/android/scripts/import-keystore.sh
+          # 只把路径暴露给后续步骤(Gradle 脚本按它定位 keystore);密码走 properties。
+          printf 'ANDROID_KEYSTORE_PATH=%s\n' "$(sed -n 's/^keystore_path=//p' "$GITHUB_OUTPUT" | tail -1)" >> "$GITHUB_ENV"
+
+      - name: 构建
+        if: inputs.build_command != ''
+        env:
+          BUILD_COMMAND: ${{ inputs.build_command }}
+          EASYRELEASE_VERSION: ${{ steps.meta.outputs.version }}
+        run: bash -c "$BUILD_COMMAND"
+
+      - name: 校验产物
+        id: verify
+        uses: ./.easyrelease/android
+        with:
+          apk: ${{ inputs.apk }}
+          aab: ${{ inputs.aab }}
+          expected_package: ${{ inputs.package_name }}
+          expected_version_name: ${{ steps.meta.outputs.version }}
+          expected_version_code: ${{ inputs.version_code }}
+          forbidden_strings: ${{ inputs.forbidden_strings }}
+          require_abis: ${{ inputs.require_abis }}
+          min_target_sdk: ${{ inputs.min_target_sdk }}
+          build_tools: ${{ inputs.build_tools }}
+          dry_run: ${{ inputs.dry_run }}
+
+      - name: 整理上传目录(扁平结构)
+        if: inputs.upload_artifact
+        env:
+          APK: ${{ steps.verify.outputs.apk }}
+          AAB: ${{ steps.verify.outputs.aab }}
+          MANIFEST: ${{ steps.verify.outputs.manifest_path }}
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/easyrelease-upload"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          [ -n "$APK" ] && cp "$APK" "$stage/$(basename "$APK")"
+          [ -n "$AAB" ] && cp "$AAB" "$stage/$(basename "$AAB")"
+          cp "$MANIFEST" "$stage/android-manifest.json"
+
+      - name: 上传产物与 manifest
+        if: inputs.upload_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: easyrelease-${{ inputs.app }}
+          path: ${{ runner.temp }}/easyrelease-upload
+          if-no-files-found: error
+
+      - name: 打包发布物
+        if: inputs.release && !inputs.dry_run
+        env:
+          APK: ${{ steps.verify.outputs.apk }}
+          AAB: ${{ steps.verify.outputs.aab }}
+          MANIFEST: ${{ steps.verify.outputs.manifest_path }}
+          APP: ${{ inputs.app }}
+          TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          [ -n "$TAG" ] || { echo "::error::release=true 时 release_tag 不能为空"; exit 1; }
+          out="$RUNNER_TEMP/easyrelease-release"
+          rm -rf "$out"
+          mkdir -p "$out"
+          files=()
+          if [ -n "$APK" ]; then
+            cp "$APK" "$out/$APP-$TAG.apk"; files+=("$out/$APP-$TAG.apk")
+          fi
+          if [ -n "$AAB" ]; then
+            cp "$AAB" "$out/$APP-$TAG.aab"; files+=("$out/$APP-$TAG.aab")
+          fi
+          cp "$MANIFEST" "$out/$APP-$TAG-manifest.json"
+          files+=("$out/$APP-$TAG-manifest.json")
+          : > "$out/release-files.txt"
+          for f in "${files[@]}"; do
+            name="$(basename "$f")"
+            if command -v sha256sum >/dev/null 2>&1; then
+              ( cd "$out" && sha256sum "$name" > "$name.sha256" )
+            else
+              ( cd "$out" && shasum -a 256 "$name" > "$name.sha256" )
+            fi
+            printf '%s\n%s\n' "$out/$name" "$out/$name.sha256" >> "$out/release-files.txt"
+          done
+          cat "$out/release-files.txt"
+
+      - name: 创建 GitHub Release
+        if: inputs.release && !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag || github.ref_name }}
+          FILES: ${{ inputs.release_files }}
+          PACKAGED_FILES: ${{ runner.temp }}/easyrelease-release/release-files.txt
+          MANIFEST: ${{ steps.verify.outputs.manifest_path }}
+          APK: ${{ steps.verify.outputs.apk }}
+        run: |
+          set -euo pipefail
+          [ -n "$TAG" ] || { echo "::error::release=true 时 release_tag 不能为空"; exit 1; }
+          files=()
+          if [ -n "$FILES" ]; then
+            while IFS= read -r line; do
+              [ -n "$line" ] || continue
+              for f in $line; do [ -e "$f" ] && files+=("$f"); done
+            done <<< "$FILES"
+          elif [ -f "$PACKAGED_FILES" ]; then
+            while IFS= read -r f; do [ -n "$f" ] && files+=("$f"); done < "$PACKAGED_FILES"
+          else
+            [ -n "$APK" ] && files+=("$APK")
+            files+=("$MANIFEST")
+          fi
+          [ ${#files[@]} -gt 0 ] || { echo "::error::没有可发布文件"; exit 1; }
+          gh release create "$TAG" "${files[@]}" --verify-tag --generate-notes
+
+      # 密钥文件不留在 runner 上。即使前面的步骤失败也要清理。
+      - name: 清理签名密钥
+        if: always()
+        env:
+          KEYSTORE: ${{ inputs.keystore_path }}
+          PROPERTIES: ${{ inputs.keystore_properties }}
+          DEFAULT_DIR: ${{ runner.temp }}/easyrelease-android
+        run: |
+          set -euo pipefail
+          [ -n "$KEYSTORE" ] && rm -f "$KEYSTORE"
+          [ -n "$PROPERTIES" ] && rm -f "$PROPERTIES"
+          rm -rf "$DEFAULT_DIR"
+          true

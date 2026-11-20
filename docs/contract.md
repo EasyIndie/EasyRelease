@@ -7,6 +7,7 @@
 | 做 | 不做 |
 |---|---|
 | 对已有产物签名、公证、staple、校验 | 构建 SwiftPM / Xcode / Gradle 工程 |
+| 校验 Android APK / AAB(清单 / 版本 / 签名 / ABI / 结构) | 构建 APK / AAB、上架商店 |
 | 生成 `manifest.json` 与校验结果 | 决定版本号策略、打 tag |
 | 用平台原生工具 | 引入 fastlane / 第三方公证 SDK |
 | 接收调用方注入的凭证 | 存储、读取、回传凭证 |
@@ -62,6 +63,35 @@
 处理流程:解包 → 签名/公证/staple 内层 → 重新打包为 `<name>-signed.zip` → 再解压校验。
 manifest 会记录 `container=zip`、`inner_artifact`、`inner_kind`。
 
+## 4b. Android 专属输入
+
+> 校验项与排错见 [android.md](android.md)。`android-v0.1.0` **只校验不签名**:
+> 签名在构建期由业务仓库完成(CI 构建前还原密钥),事后重签会破坏 v2/v3 签名链。
+
+| 输入 | 用途 | 何时必填 |
+|---|---|---|
+| `apk` | `.apk` 路径 | 与 `aab` 至少一个 |
+| `aab` | `.aab` 路径 | 与 `apk` 至少一个 |
+| `expected_package` | 期望的 applicationId | 建议填 |
+| `expected_version_name` / `expected_version_code` | 期望版本 | 建议填 |
+| `expected_sha256` | 签名证书 SHA-256,逗号分隔可多个 | 建议填(锁死密钥) |
+| `forbidden_strings` | 产物里不允许出现的字符串(如 debug 钩子的广播 action) | 按需 |
+| `require_abis` | 必须包含的 ABI,默认 `arm64-v8a` | 按需 |
+| `min_target_sdk` | targetSdk 下限 | 按需(Play / 国内商店门槛由调用方决定) |
+| `build_tools` | 显式指定 build-tools 目录 | 留空则从 `ANDROID_HOME` 挑最高版本 |
+
+reusable workflow 额外接受:`build_command`(构建命令,留空表示产物已存在)、
+`tag_prefix`(从 `GITHUB_REF_NAME` 剥前缀得版本)、`version_file` / `version_file_key`
+(可选的版本一致性断言)、`keystore_path` / `keystore_properties` / `alias_property`
+(密钥落盘位置与 properties 写法)、`upload_artifact`。
+
+**密钥与凭据**全部来自 secrets(`ANDROID_KEYSTORE_BASE64` / `ANDROID_STORE_PASSWORD` /
+`ANDROID_KEY_PASSWORD` / `ANDROID_KEY_ALIAS`),与 EasyIndie 组织一致,
+调用方直接 `secrets: inherit`。没给 base64 时跳过还原并打 warning。
+
+`keystore.properties` 的 `storeFile` 写**相对 properties 文件的路径**,
+这样同一份配置在本机与 CI 都能用。
+
 ## 5. 输出
 
 | 输出 | 说明 |
@@ -71,6 +101,17 @@ manifest 会记录 `container=zip`、`inner_artifact`、`inner_kind`。
 | `manifest_path` | `manifest.json` 路径 |
 | `notarization_id` | `notarytool` submission id;未公证为空 |
 | `verified` | `true` / `false` |
+
+Android 侧输出(平台字段用 `platform: "android"`,签名相关输出留空):
+
+| 输出 | 说明 |
+|---|---|
+| `artifact` | 主产物(有 APK 时是 APK,否则 AAB) |
+| `apk` / `aab` | 各自的绝对路径 |
+| `sha256` / `sha256_aab` | 各自的 SHA-256 |
+| `package` / `version_name` / `version_code` | 从产物里读出来的值 |
+| `certificate_sha256` | 签名证书指纹(小写十六进制) |
+| `verified` | APK 与 AAB 的校验是否全部通过 |
 
 zip 输入时 `signed_artifact` 指向新生成的 `<name>-signed.zip`。
 
@@ -107,6 +148,36 @@ reusable workflow 在 `upload_artifact: true` 时上传**扁平** artifact:
   "sha256": "…",
   "toolchain": { "xcode": "Xcode 27.0", "macos": "27.0.1" },
   "created_at": "2026-10-24T12:00:00Z"
+}
+```
+
+约定:
+
+Android 用同一套字段,`platform: "android"`,签名相关字段留空,另加产物维度:
+
+```json
+{
+  "schema": 1,
+  "platform": "android",
+  "status": "ok",
+  "artifact": "/abs/path/app-release.apk",
+  "artifact_kind": "apk",
+  "apk": "/abs/path/app-release.apk",
+  "aab": "/abs/path/app-release.aab",
+  "bundle_id": "com.example.myapp",
+  "version": "1.2.3",
+  "build": "10203",
+  "target_sdk": "36",
+  "abis": "arm64-v8a armeabi-v7a",
+  "certificate_sha256": "d8121929…",
+  "dry_run": false,
+  "verified": true,
+  "apk_verified": true,
+  "aab_verified": true,
+  "sha256": "…",
+  "sha256_aab": "…",
+  "toolchain": { "build_tools": "36.0.0", "java": "/opt/java" },
+  "created_at": "2026-11-20T12:00:00Z"
 }
 ```
 
@@ -171,3 +242,7 @@ composite action 不能提升权限,只能使用调用方授予的上限。
 | EasyRelease | Xcode | macOS | 备注 |
 |---|---|---|---|
 | `apple-v0.x` | 27.0 | 26+/27 | 与 EasyApple 当前环境对齐;2026-10-24 快照 |
+
+| EasyRelease | build-tools | JDK | 备注 |
+|---|---|---|---|
+| `android-v0.1.0` | 36.0.0 | 17 | 只校验;本地自测 21 项通过(WSL2);2026-11-20 快照 |
