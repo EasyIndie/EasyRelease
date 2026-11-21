@@ -72,6 +72,11 @@ on:
         type: string
         required: false
         default: version
+      mode:
+        description: "verify(默认,产物已签名)或 sign(产物未签名,用 secrets 里的 keystore 补签)"
+        type: string
+        required: false
+        default: verify
       apk:
         description: "APK 路径;留空表示不产出 APK"
         type: string
@@ -256,6 +261,11 @@ jobs:
         id: verify
         uses: ./.easyrelease/android
         with:
+          mode: ${{ inputs.mode }}
+          keystore_base64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          store_password: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          key_password: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          key_alias: ${{ secrets.ANDROID_KEY_ALIAS }}
           apk: ${{ inputs.apk }}
           aab: ${{ inputs.aab }}
           expected_package: ${{ inputs.package_name }}

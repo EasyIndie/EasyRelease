@@ -9,6 +9,7 @@ EASYRELEASE_TOOL_AAPT2=""
 EASYRELEASE_TOOL_APKSIGNER=""
 EASYRELEASE_TOOL_JARSIGNER=""
 EASYRELEASE_TOOL_KEYTOOL=""
+EASYRELEASE_TOOL_ZIPALIGN=""
 EASYRELEASE_BUILD_TOOLS=""
 
 # 版本比较:挑最高的 build-tools。优先 sort -V(GNU),
@@ -72,6 +73,9 @@ easyrelease_resolve_tools() {
   EASYRELEASE_TOOL_APKSIGNER="$EASYRELEASE_BUILD_TOOLS/apksigner"
   [ -f "$EASYRELEASE_TOOL_APKSIGNER" ] || die "缺少 apksigner:$EASYRELEASE_TOOL_APKSIGNER"
 
+  EASYRELEASE_TOOL_ZIPALIGN="$EASYRELEASE_BUILD_TOOLS/zipalign"
+  [ -f "$EASYRELEASE_TOOL_ZIPALIGN" ] || die "缺少 zipalign:$EASYRELEASE_TOOL_ZIPALIGN"
+
   if [ -n "${JAVA_HOME:-}" ] && [ -f "$JAVA_HOME/bin/jarsigner" ]; then
     EASYRELEASE_TOOL_JARSIGNER="$JAVA_HOME/bin/jarsigner"
   else
@@ -115,6 +119,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   printf 'build-tools : %s\n' "$EASYRELEASE_BUILD_TOOLS"
   printf 'aapt2       : %s\n' "$EASYRELEASE_TOOL_AAPT2"
   printf 'apksigner   : %s\n' "$EASYRELEASE_TOOL_APKSIGNER"
+  printf 'zipalign    : %s\n' "$EASYRELEASE_TOOL_ZIPALIGN"
   printf 'jarsigner   : %s\n' "$EASYRELEASE_TOOL_JARSIGNER"
   printf 'keytool     : %s\n' "$EASYRELEASE_TOOL_KEYTOOL"
 fi

@@ -21,7 +21,7 @@ Apple(以及后续 Android)发布通用能力的**独立仓库**。业务项目�
 | reusable workflow / `secrets: inherit` | ✅ |
 | `release.yml` dry-run | ✅ |
 | **Android 校验**(APK/AAB:包名 / 版本 / 签名指纹 / ABI / Bundle 结构) | ✅ 21 项自测 |
-| Android `mode=sign`(构建产物未签名时事后签) | ⏳ `android-v0.2.0` |
+| Android `mode=sign`(构建产物未签名时补签:`zipalign` + `apksigner` / `jarsigner`) | ✅ |
 
 > run、公证 ID、复现命令与未覆盖项统一见 [docs/verification.md](docs/verification.md)。
 > 证书到期与轮换见 [docs/credentials.md](docs/credentials.md) 第 9 节;
@@ -84,8 +84,9 @@ jobs:
     secrets: inherit
 ```
 
-`android-v0.1.0` **只校验不签名** —— 签名在构建期由 Gradle 完成(密钥由本仓库在
+默认 `mode=verify`(**只校验不签名**)—— 签名在构建期由 Gradle 完成(密钥由本仓库在
 构建前还原),事后重签会破坏 v2/v3 签名链与 Play 的 upload key。
+构建产物确实未签名时,传 `mode: sign` + 四个 `ANDROID_*` 凭据,由本仓库补签。
 校验项、凭证与排错见 [docs/android.md](docs/android.md)。
 
 ## 本地自测(不需要证书)
@@ -145,6 +146,7 @@ docs/
 | `apple-v0.6.4` | 修复 `.pkg` 的 `productsign` 无头卡住;`.pkg` 真链路验证通过 |
 | `apple-v0` | 浮动别名,只用于试用 |
 | `android-v0.1.0` | Android 首个版本:**只校验不签名**(APK/AAB + manifest) |
+| `android-v0.2.0` | 增加 `mode=sign`:未签名产物现场补签(zipalign + apksigner / jarsigner) |
 | `android-v0` | 浮动别名,只用于试用 |
 
 生产建议 pin 精确 tag 或 commit SHA,不要 `@main`。

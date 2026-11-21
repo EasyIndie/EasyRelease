@@ -65,11 +65,14 @@ manifest 会记录 `container=zip`、`inner_artifact`、`inner_kind`。
 
 ## 4b. Android 专属输入
 
-> 校验项与排错见 [android.md](android.md)。`android-v0.1.0` **只校验不签名**:
-> 签名在构建期由业务仓库完成(CI 构建前还原密钥),事后重签会破坏 v2/v3 签名链。
+> 校验项与排错见 [android.md](android.md)。默认 `mode=verify`(**只校验**):
+> 签名在构建期由业务仓库完成,事后重签会破坏 v2/v3 签名链。产物确实未签名时
+> 才用 `mode=sign`(`android-v0.2.0` 起),由本 action 补签。
 
 | 输入 | 用途 | 何时必填 |
 |---|---|---|
+| `mode` | `verify`(默认)/ `sign` | 产物未签名时 |
+| `keystore_base64` / `store_password` / `key_password` / `key_alias` | 补签用凭据 | `mode=sign` |
 | `apk` | `.apk` 路径 | 与 `aab` 至少一个 |
 | `aab` | `.aab` 路径 | 与 `apk` 至少一个 |
 | `expected_package` | 期望的 applicationId | 建议填 |
@@ -112,6 +115,7 @@ Android 侧输出(平台字段用 `platform: "android"`,签名相关输出留空
 | `package` / `version_name` / `version_code` | 从产物里读出来的值 |
 | `certificate_sha256` | 签名证书指纹(小写十六进制) |
 | `verified` | APK 与 AAB 的校验是否全部通过 |
+| `mode` / `signed` | 实际模式;`sign` 模式下产物是补签后的 `*-signed.apk` / `*-signed.aab` |
 
 zip 输入时 `signed_artifact` 指向新生成的 `<name>-signed.zip`。
 
@@ -170,6 +174,10 @@ Android 用同一套字段,`platform: "android"`,签名相关字段留空,另加
   "target_sdk": "36",
   "abis": "arm64-v8a armeabi-v7a",
   "certificate_sha256": "d8121929…",
+  "mode": "verify",
+  "signed": false,
+  "input_apk": "/abs/path/app-release.apk",
+  "input_aab": "/abs/path/app-release.aab",
   "dry_run": false,
   "verified": true,
   "apk_verified": true,
@@ -246,3 +254,4 @@ composite action 不能提升权限,只能使用调用方授予的上限。
 | EasyRelease | build-tools | JDK | 备注 |
 |---|---|---|---|
 | `android-v0.1.0` | 36.0.0 | 17 | 只校验;本地自测 21 项通过(WSL2);2026-11-20 快照 |
+| `android-v0.2.0` | 36.0.0 | 17 | 增加 `mode=sign`;自测 29 项 |

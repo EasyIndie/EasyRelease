@@ -3,9 +3,11 @@
 # EasyRelease Android 入口:校验 APK / AAB → 生成 manifest → 输出。
 # 由 android/action.yml 调用,所有输入通过 EASYRELEASE_* 环境变量传入。
 #
-# 为什么 v0.1.0 只校验不签名:绝大多数 Gradle 工程在构建期就用签名配置签好了
-# (密钥由 CI 在构建前还原),事后重签只会破坏 v2/v3 签名链与 Play 的 upload key。
-# 需要「构建产物未签名、发布时再签」的场景留给 android-v0.2.0 的 mode=sign。
+# 两种模式:
+#   mode=verify(默认)—— 产物在构建期已签名,这里只校验;
+#   mode=sign(v0.2.0)—— 产物是未签名的,在这里用注入的 keystore 补签。
+# 绝大多数 Gradle 工程属于前者:构建期就用 signingConfigs 签好了,事后重签
+# 只会破坏 v2/v3 签名链与 Play 的 upload key。
 
 set -euo pipefail
 
@@ -14,9 +16,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../lib/common.sh"
 source "$SCRIPT_DIR/resolve-tools.sh"
 source "$SCRIPT_DIR/verify.sh"
+source "$SCRIPT_DIR/import-keystore.sh"
+source "$SCRIPT_DIR/sign.sh"
 
 APK_INPUT="${EASYRELEASE_APK:-}"
 AAB_INPUT="${EASYRELEASE_AAB:-}"
+MODE="${EASYRELEASE_MODE:-verify}"
+KEYSTORE_BASE64="${EASYRELEASE_KEYSTORE_BASE64:-}"
+STORE_PASSWORD="${EASYRELEASE_STORE_PASSWORD:-}"
+KEY_PASSWORD="${EASYRELEASE_KEY_PASSWORD:-}"
+KEY_ALIAS="${EASYRELEASE_KEY_ALIAS:-}"
 EXPECTED_PACKAGE="${EASYRELEASE_EXPECTED_PACKAGE:-}"
 EXPECTED_VERSION_NAME="${EASYRELEASE_EXPECTED_VERSION_NAME:-}"
 EXPECTED_VERSION_CODE="${EASYRELEASE_EXPECTED_VERSION_CODE:-}"
@@ -39,12 +48,25 @@ trap 'easyrelease_cleanup_temp' EXIT
 [ -n "$APK_INPUT" ] && APK="$(abspath "$APK_INPUT")" || APK=""
 [ -n "$AAB_INPUT" ] && AAB="$(abspath "$AAB_INPUT")" || AAB=""
 
+case "$MODE" in
+  verify|sign) ;;
+  *) die "mode 只能是 verify 或 sign,当前:$MODE" ;;
+esac
+
+if [ "$MODE" = "sign" ]; then
+  [ -n "$KEYSTORE_BASE64" ] || die "mode=sign 需要 keystore_base64"
+  [ -n "$STORE_PASSWORD" ] || die "mode=sign 需要 store_password"
+  [ -n "$KEY_ALIAS" ] || die "mode=sign 需要 key_alias"
+  [ -n "$KEY_PASSWORD" ] || die "mode=sign 需要 key_password"
+fi
+
 easyrelease_resolve_tools "$BUILD_TOOLS_INPUT"
 
 note "EasyRelease Android"
 printf '  apk          : %s\n' "${APK:-—}"
 printf '  aab          : %s\n' "${AAB:-—}"
 printf '  build-tools  : %s\n' "$EASYRELEASE_BUILD_TOOLS"
+printf '  mode         : %s\n' "$MODE"
 printf '  expect pkg   : %s\n' "${EXPECTED_PACKAGE:-—}"
 printf '  expect ver   : %s\n' "${EXPECTED_VERSION_NAME:-—}"
 printf '  expect code  : %s\n' "${EXPECTED_VERSION_CODE:-—}"
@@ -57,6 +79,28 @@ if is_true "$DEBUG"; then
   printf '  uname        : %s\n' "$(uname -srm)"
 fi
 end_note
+
+SIGNED_APK=""
+SIGNED_AAB=""
+if [ "$MODE" = "sign" ]; then
+  note "签名"
+  KEYSTORE_FILE="$WORK/keystore.jks"
+  easyrelease_import_keystore "$KEYSTORE_BASE64" "$KEYSTORE_FILE" \
+    "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" "" "" >/dev/null
+  if [ -n "$APK" ]; then
+    SIGNED_APK="$(_easyrelease_signed_name "$APK" signed)"
+    easyrelease_sign_apk "$APK" "$SIGNED_APK" "$KEYSTORE_FILE" \
+      "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" "$WORK"
+    APK="$SIGNED_APK"
+  fi
+  if [ -n "$AAB" ]; then
+    SIGNED_AAB="$(_easyrelease_signed_name "$AAB" signed)"
+    easyrelease_sign_aab "$AAB" "$SIGNED_AAB" "$KEYSTORE_FILE" \
+      "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD"
+    AAB="$SIGNED_AAB"
+  fi
+  end_note
+fi
 
 note "校验"
 if [ -n "$APK" ]; then
@@ -106,6 +150,10 @@ cat > "$MANIFEST" <<EOF
   "target_sdk": "$(json_escape "$EASYRELEASE_ANDROID_TARGET_SDK")",
   "abis": "$(json_escape "$EASYRELEASE_ANDROID_ABIS")",
   "certificate_sha256": "$(json_escape "$EASYRELEASE_ANDROID_FINGERPRINT")",
+  "mode": "$(json_escape "$MODE")",
+  "signed": $(if [ "$MODE" = "sign" ]; then echo true; else echo false; fi),
+  "input_apk": "$(json_escape "$APK_INPUT")",
+  "input_aab": "$(json_escape "$AAB_INPUT")",
   "dry_run": $(json_bool "$DRY_RUN"),
   "verified": $(json_bool "$(if [ "$EASYRELEASE_ANDROID_FAILURES" -eq 0 ]; then echo true; else echo false; fi)"),
   "apk_verified": $(json_bool "$EASYRELEASE_ANDROID_APK_VERIFIED"),
@@ -131,6 +179,8 @@ write_output version_code "$EASYRELEASE_ANDROID_VERSION_CODE"
 write_output package "$EASYRELEASE_ANDROID_PACKAGE"
 write_output certificate_sha256 "$EASYRELEASE_ANDROID_FINGERPRINT"
 write_output verified "$(if [ "$EASYRELEASE_ANDROID_FAILURES" -eq 0 ]; then echo true; else echo false; fi)"
+write_output mode "$MODE"
+write_output signed "$(if [ "$MODE" = "sign" ]; then echo true; else echo false; fi)"
 
 {
   echo "### EasyRelease Android"
@@ -139,6 +189,7 @@ write_output verified "$(if [ "$EASYRELEASE_ANDROID_FAILURES" -eq 0 ]; then echo
   echo "|---|---|"
   echo "| APK | \`${APK:-—}\` |"
   echo "| AAB | \`${AAB:-—}\` |"
+  echo "| 模式 | $MODE |"
   echo "| 包名 | ${EASYRELEASE_ANDROID_PACKAGE:-—} |"
   echo "| 版本 | ${EASYRELEASE_ANDROID_VERSION_NAME:-—} (${EASYRELEASE_ANDROID_VERSION_CODE:-—}) |"
   echo "| targetSdk | ${EASYRELEASE_ANDROID_TARGET_SDK:-—} |"
