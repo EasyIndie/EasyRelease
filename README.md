@@ -67,7 +67,7 @@ jobs:
   release:
     permissions:
       contents: write
-    uses: EasyIndie/EasyRelease/.github/workflows/android-release.yml@android-v0.1.0
+    uses: EasyIndie/EasyRelease/.github/workflows/android-release.yml@android-v0.3.0
     with:
       app: MyApp
       package_name: com.example.myapp
@@ -147,6 +147,7 @@ docs/
 | `apple-v0` | 浮动别名,只用于试用 |
 | `android-v0.1.0` | Android 首个版本:**只校验不签名**(APK/AAB + manifest) |
 | `android-v0.2.0` | 增加 `mode=sign`:未签名产物现场补签(zipalign + apksigner / jarsigner) |
+| `android-v0.3.0` | 跨平台调用扩展点:`EASYRELEASE_PATH_HELPER` / 工具路径预置(供 Windows 上的调用方) |
 | `android-v0` | 浮动别名,只用于试用 |
 
 生产建议 pin 精确 tag 或 commit SHA,不要 `@main`。
