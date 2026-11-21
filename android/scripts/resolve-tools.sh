@@ -42,6 +42,36 @@ easyrelease_android_sdk_root() {
   return 1
 }
 
+# 把「要交给原生工具读的路径」过一遍转换。默认恒等;跨平台调用方可以设
+# EASYRELEASE_PATH_HELPER=win_of 之类,让 Windows 上的 Git Bash 把 /e/... 转成
+# E:/... —— 原生 exe 只认后者。
+easyrelease_tool_path() {
+  if [ -n "${EASYRELEASE_PATH_HELPER:-}" ]; then
+    "$EASYRELEASE_PATH_HELPER" "$1"
+  else
+    printf '%s' "$1"
+  fi
+}
+
+# build_tools 里的工具在 Linux/macOS 上无后缀,Windows 上是 .exe/.bat。
+# 这里按「无后缀 → .exe → .bat」找第一个存在的,顺便让调用方可以用
+# EASYRELEASE_TOOL_* 预置(用于注入 shim,例如 Windows 上把 apksigner.bat
+# 换成 `java -jar lib/apksigner.jar`)。
+_easyrelease_resolve_tool() {
+  local pre="$1" dir="$2" base="$3" c
+  if [ -n "$pre" ]; then
+    printf '%s' "$pre"
+    return 0
+  fi
+  for c in "$dir/$base" "$dir/$base.exe" "$dir/$base.bat"; do
+    if [ -f "$c" ]; then
+      printf '%s' "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # build_tools 输入可以显式指定;留空则从 SDK 里挑最高版本。
 easyrelease_resolve_build_tools() {
   local explicit="${1:-}"
@@ -67,26 +97,34 @@ easyrelease_resolve_tools() {
   local build_tools_input="${1:-}"
   easyrelease_resolve_build_tools "$build_tools_input"
 
-  EASYRELEASE_TOOL_AAPT2="$EASYRELEASE_BUILD_TOOLS/aapt2"
-  [ -f "$EASYRELEASE_TOOL_AAPT2" ] || die "缺少 aapt2:$EASYRELEASE_TOOL_AAPT2"
+  EASYRELEASE_TOOL_AAPT2="$(_easyrelease_resolve_tool "${EASYRELEASE_TOOL_AAPT2:-}" \
+    "$EASYRELEASE_BUILD_TOOLS" aapt2)" || die "缺少 aapt2(目录 $EASYRELEASE_BUILD_TOOLS)"
 
-  EASYRELEASE_TOOL_APKSIGNER="$EASYRELEASE_BUILD_TOOLS/apksigner"
-  [ -f "$EASYRELEASE_TOOL_APKSIGNER" ] || die "缺少 apksigner:$EASYRELEASE_TOOL_APKSIGNER"
+  EASYRELEASE_TOOL_APKSIGNER="$(_easyrelease_resolve_tool "${EASYRELEASE_TOOL_APKSIGNER:-}" \
+    "$EASYRELEASE_BUILD_TOOLS" apksigner)" || die "缺少 apksigner(目录 $EASYRELEASE_BUILD_TOOLS)"
 
-  EASYRELEASE_TOOL_ZIPALIGN="$EASYRELEASE_BUILD_TOOLS/zipalign"
-  [ -f "$EASYRELEASE_TOOL_ZIPALIGN" ] || die "缺少 zipalign:$EASYRELEASE_TOOL_ZIPALIGN"
+  EASYRELEASE_TOOL_ZIPALIGN="$(_easyrelease_resolve_tool "${EASYRELEASE_TOOL_ZIPALIGN:-}" \
+    "$EASYRELEASE_BUILD_TOOLS" zipalign)" || die "缺少 zipalign(目录 $EASYRELEASE_BUILD_TOOLS)"
 
-  if [ -n "${JAVA_HOME:-}" ] && [ -f "$JAVA_HOME/bin/jarsigner" ]; then
-    EASYRELEASE_TOOL_JARSIGNER="$JAVA_HOME/bin/jarsigner"
-  else
-    EASYRELEASE_TOOL_JARSIGNER="$(command -v jarsigner || true)"
+  if [ -z "${EASYRELEASE_TOOL_JARSIGNER:-}" ]; then
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/jarsigner" ]; then
+      EASYRELEASE_TOOL_JARSIGNER="$JAVA_HOME/bin/jarsigner"
+    elif [ -n "${JAVA_HOME:-}" ] && [ -f "$JAVA_HOME/bin/jarsigner.exe" ]; then
+      EASYRELEASE_TOOL_JARSIGNER="$JAVA_HOME/bin/jarsigner.exe"
+    else
+      EASYRELEASE_TOOL_JARSIGNER="$(command -v jarsigner || true)"
+    fi
   fi
   [ -n "$EASYRELEASE_TOOL_JARSIGNER" ] || die "缺少 jarsigner(需要 JDK 17+)"
 
-  if [ -n "${JAVA_HOME:-}" ] && [ -f "$JAVA_HOME/bin/keytool" ]; then
-    EASYRELEASE_TOOL_KEYTOOL="$JAVA_HOME/bin/keytool"
-  else
-    EASYRELEASE_TOOL_KEYTOOL="$(command -v keytool || true)"
+  if [ -z "${EASYRELEASE_TOOL_KEYTOOL:-}" ]; then
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/keytool" ]; then
+      EASYRELEASE_TOOL_KEYTOOL="$JAVA_HOME/bin/keytool"
+    elif [ -n "${JAVA_HOME:-}" ] && [ -f "$JAVA_HOME/bin/keytool.exe" ]; then
+      EASYRELEASE_TOOL_KEYTOOL="$JAVA_HOME/bin/keytool.exe"
+    else
+      EASYRELEASE_TOOL_KEYTOOL="$(command -v keytool || true)"
+    fi
   fi
   [ -n "$EASYRELEASE_TOOL_KEYTOOL" ] || die "缺少 keytool(需要 JDK 17+)"
 }

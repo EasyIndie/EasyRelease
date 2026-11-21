@@ -142,7 +142,23 @@ base64 -i keystore/release.jks | tr -d '\n'         # macOS
 `jar verified, with signer errors.`。所以这里用 `jarsigner -verify` + 断言
 `jar verified`,再用 `keytool -printcert` 单独比对指纹 —— 那才是商店真正关心的东西。
 
-## 5. 本地自测(不需要发布证书)
+## 5. 跨平台调用(Git Bash / Windows)
+
+本仓库的脚本按 Linux/macOS 写;在 Windows 的 Git Bash 里跑时,原生工具
+(`aapt2.exe` / `apksigner.bat` / `jarsigner.exe`)不认 `/e/...` 这种 POSIX 路径。
+两个扩展点(都由**调用方**设置,公共库里不放平台分支):
+
+| 环境变量 | 作用 |
+|---|---|
+| `EASYRELEASE_PATH_HELPER=<cmd>` | 每个要交给原生工具的路径先过这个命令(如 `win_of`) |
+| `EASYRELEASE_TOOL_APKSIGNER=<cmd>` | 预置工具入口;Windows 上可指到一个 `java -jar lib/apksigner.jar` 的 shim,绕开 `.bat` 对 `JAVA_HOME` 的硬校验 |
+
+同样支持预置 `EASYRELEASE_TOOL_AAPT2` / `_ZIPALIGN` / `_JARSIGNER` / `_KEYTOOL`。
+
+> EasyAndroid 的 `tools/easyrelease.sh` 就是这么调用的:它在 Windows 上自动注入
+> `win_of` 与 apksigner shim,所以本仓库不需要知道 Git Bash 的存在。
+
+## 6. 本地自测(不需要发布证书)
 
 ```bash
 ANDROID_HOME=/opt/android-sdk bash scripts/local-selftest-android.sh
@@ -153,7 +169,7 @@ ANDROID_HOME=/opt/android-sdk bash scripts/local-selftest-android.sh
 密钥还原与各条失败路径。2026-11-20 在本机(WSL2 / build-tools 36.0.0 / JDK 17)
 **21 项全通过**。
 
-## 6. 输入对照(与 Apple 侧)
+## 7. 输入对照(与 Apple 侧)
 
 | Apple | Android | 说明 |
 |---|---|---|
@@ -165,7 +181,7 @@ ANDROID_HOME=/opt/android-sdk bash scripts/local-selftest-android.sh
 | `bundle_id` / `version` / `build_number` | `expected_package` / `expected_version_name` / `expected_version_code` | |
 | `notarize` / `notary_auth` | — | Android 没有对偶概念 |
 
-## 7. 排错
+## 8. 排错
 
 | 症状 | 原因 / 处理 |
 |---|---|
