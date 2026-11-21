@@ -6,6 +6,26 @@ branding:
   color: green
 
 inputs:
+  mode:
+    description: "verify(默认,产物已签名)或 sign(产物未签名,用注入的 keystore 补签)"
+    required: false
+    default: verify
+  keystore_base64:
+    description: "签名密钥库(.jks/.keystore)的 base64;mode=sign 时必填"
+    required: false
+    default: ""
+  store_password:
+    description: "keystore 密码;mode=sign 时必填"
+    required: false
+    default: ""
+  key_password:
+    description: "key 密码;mode=sign 时必填(PKCS12 下与 store 密码相同)"
+    required: false
+    default: ""
+  key_alias:
+    description: "key 别名;mode=sign 时必填"
+    required: false
+    default: ""
   apk:
     description: 待校验的 .apk 路径(与 aab 至少给一个)
     required: false
@@ -60,6 +80,12 @@ inputs:
     default: "false"
 
 outputs:
+  mode:
+    description: 实际使用的模式(verify / sign)
+    value: ${{ steps.verify.outputs.mode }}
+  signed:
+    description: 本次是否执行了补签
+    value: ${{ steps.verify.outputs.signed }}
   artifact:
     description: 主产物绝对路径(有 APK 时指向 APK,否则 AAB)
     value: ${{ steps.verify.outputs.artifact }}
@@ -100,6 +126,11 @@ runs:
     - id: verify
       shell: bash
       env:
+        EASYRELEASE_MODE: ${{ inputs.mode }}
+        EASYRELEASE_KEYSTORE_BASE64: ${{ inputs.keystore_base64 }}
+        EASYRELEASE_STORE_PASSWORD: ${{ inputs.store_password }}
+        EASYRELEASE_KEY_PASSWORD: ${{ inputs.key_password }}
+        EASYRELEASE_KEY_ALIAS: ${{ inputs.key_alias }}
         EASYRELEASE_APK: ${{ inputs.apk }}
         EASYRELEASE_AAB: ${{ inputs.aab }}
         EASYRELEASE_EXPECTED_PACKAGE: ${{ inputs.expected_package }}

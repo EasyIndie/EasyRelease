@@ -84,6 +84,22 @@ APK="$TMP/fixture.apk"
 make_apk "$APK" false yes
 ok "fixture APK 已生成并签名"
 
+UNSIGNED_APK="$TMP/fixture-unsigned.apk"
+make_unsigned_apk() { # $1=输出
+  local dir; dir="$(mktemp -d "$TMP/raw.XXXXXX")"
+  make_manifest false 1.2.3 42 > "$dir/AndroidManifest.xml"
+  "$AAPT2" link -o "$1" --manifest "$dir/AndroidManifest.xml" -I "$ANDROID_JAR" >/dev/null 2>&1
+  python3 - "$1" <<'PY'
+import sys, zipfile
+p = sys.argv[1]
+with zipfile.ZipFile(p, "a", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("classes.dex", b"FIXTURE_DEX_PAYLOAD")
+    z.writestr("lib/arm64-v8a/libfixture.so", b"fake")
+PY
+}
+make_unsigned_apk "$UNSIGNED_APK"
+ok "未签名 fixture APK 已生成"
+
 FINGERPRINT="$("$APKSIGNER" verify --print-certs "$APK" \
   | awk -F': ' '/SHA-256 digest/ { print tolower($NF); exit }')"
 [ -n "$FINGERPRINT" ] && ok "fixture 指纹:${FINGERPRINT:0:16}…" || bad "取不到 fixture 指纹"
@@ -192,6 +208,66 @@ if run_action "$OUT_A" EASYRELEASE_AAB="$AAB" EASYRELEASE_EXPECTED_SHA256="$FING
 else
   bad "只给 AAB 执行失败"
 fi
+
+echo "== mode=sign:未签名 APK 补签 =="
+OUT_S="$TMP/sign-apk.txt"
+if run_action "$OUT_S" \
+  EASYRELEASE_MODE=sign \
+  EASYRELEASE_APK="$UNSIGNED_APK" \
+  EASYRELEASE_KEYSTORE_BASE64="$(base64 < "$KS" | tr -d '\n')" \
+  EASYRELEASE_STORE_PASSWORD="$STORE_PASS" \
+  EASYRELEASE_KEY_PASSWORD="$KEY_PASS" \
+  EASYRELEASE_KEY_ALIAS=fixture \
+  EASYRELEASE_EXPECTED_SHA256="$FINGERPRINT" >/dev/null; then
+  SIGNED="$(sed -n 's/^apk=//p' "$OUT_S")"
+  grep -qx 'signed=true' "$OUT_S" && ok "signed=true" || bad "signed output"
+  case "$SIGNED" in *-signed.apk) ok "输出名带 -signed" ;; *) bad "输出名:$SIGNED" ;; esac
+  "$APKSIGNER" verify "$SIGNED" >/dev/null 2>&1 && ok "补签后的 APK 校验通过" || bad "补签 APK 校验"
+  M_S="$(sed -n 's/^manifest_path=//p' "$OUT_S")"
+  python3 - "$M_S" "$FINGERPRINT" <<'PY' && ok "manifest 记录 mode/signed/指纹" || bad "sign manifest"
+import json, sys
+m = json.load(open(sys.argv[1]))
+assert m["mode"] == "sign" and m["signed"] is True, m
+assert m["certificate_sha256"] == sys.argv[2], m
+assert m["verified"] is True, m
+PY
+else
+  bad "mode=sign(APK)执行失败"
+fi
+
+echo "== mode=sign:未签名 AAB 补签 =="
+UNSIGNED_AAB="$TMP/fixture-unsigned.aab"
+python3 - "$UNSIGNED_AAB" <<'PY'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("BundleConfig.pb", b"fixture")
+    z.writestr("base/manifest/AndroidManifest.xml", b"fixture")
+    z.writestr("base/dex/classes.dex", b"FIXTURE_DEX_PAYLOAD")
+    z.writestr("base/lib/arm64-v8a/libfixture.so", b"fake")
+PY
+OUT_SA="$TMP/sign-aab.txt"
+if run_action "$OUT_SA" \
+  EASYRELEASE_MODE=sign \
+  EASYRELEASE_AAB="$UNSIGNED_AAB" \
+  EASYRELEASE_KEYSTORE_BASE64="$(base64 < "$KS" | tr -d '\n')" \
+  EASYRELEASE_STORE_PASSWORD="$STORE_PASS" \
+  EASYRELEASE_KEY_PASSWORD="$KEY_PASS" \
+  EASYRELEASE_KEY_ALIAS=fixture \
+  EASYRELEASE_EXPECTED_SHA256="$FINGERPRINT" >/dev/null; then
+  SIGNED_AAB="$(sed -n 's/^aab=//p' "$OUT_SA")"
+  "$EASYRELEASE_TOOL_JARSIGNER" -verify "$SIGNED_AAB" >/dev/null 2>&1 \
+    && ok "补签后的 AAB 校验通过" || bad "补签 AAB 校验"
+else
+  bad "mode=sign(AAB)执行失败"
+fi
+
+echo "== mode=sign 缺凭据 =="
+expect_fail "sign 缺 keystore" "$TMP/sign-nokey.txt" \
+  EASYRELEASE_MODE=sign EASYRELEASE_APK="$UNSIGNED_APK"
+
+echo "== 非法 mode =="
+expect_fail "非法 mode" "$TMP/badmode.txt" \
+  EASYRELEASE_MODE=signing EASYRELEASE_APK="$APK"
 
 echo "== 失败路径 =="
 if run_action "$TMP/none.txt" >/dev/null 2>&1; then

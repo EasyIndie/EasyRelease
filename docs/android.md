@@ -1,7 +1,7 @@
 # Android 接入
 
 > 与 [apple.md](apple.md) 对称。契约(输入/输出/manifest)见 [contract.md](contract.md)。
-> 版本:`android-v0.1.0` 起支持**校验**(不签名),签名留到 `android-v0.2.0`。
+> 版本:`android-v0.1.0` 起支持**校验**;`android-v0.2.0` 起支持 `mode=sign`(事后补签)。
 
 ## 1. 它做什么 / 不做什么
 
@@ -9,14 +9,23 @@
 |---|---|
 | 还原签名密钥(base64 → `.jks`,可选写 `keystore.properties`) | 构建 Gradle 工程(由 `build_command` 调方提供) |
 | 校验 APK:包名 / 版本 / 非 debuggable / 禁用字符串 / ABI / targetSdk / 签名指纹 | 决定版本号策略、打 tag、改 `version.properties` |
+| `mode=sign`:`zipalign` → `apksigner` / `jarsigner` 补签 | 用 Gradle `signingConfigs` 在构建期签名(那是业务仓库的事) |
 | 校验 AAB:Bundle 结构 / ABI / `jarsigner` 签名 / upload key 指纹 | 上架到 Play / 国内商店(仍需人工) |
 | 生成 `android-manifest.json` + SHA-256 | 保存任何证书或密码 |
 | 打包发布资产 + 创建 GitHub Release | 走 fastlane / bundletool 之外的第三方链路 |
 
-**为什么 v0.1.0 只校验不签名**:绝大多数 Gradle 工程在**构建期**就用 `signingConfigs`
-签好了(CI 在构建前还原密钥)。事后重签会破坏 v2/v3 签名链,还可能把 Play 的
-upload key 换掉。真要「构建产物未签名、发布时再签」的场景,留给 `android-v0.2.0`
-的 `mode=sign`。
+**默认只校验不签名**(`mode=verify`):绝大多数 Gradle 工程在**构建期**就用
+`signingConfigs` 签好了(CI 在构建前还原密钥)。事后重签会破坏 v2/v3 签名链,
+还可能把 Play 的 upload key 换掉。
+
+**什么时候用 `mode=sign`**:构建产物是**未签名**的 —— 自定义构建脚本、
+Unity / Flutter 的非标准打包、或项目故意不把密钥放进构建环境。它会
+`zipalign`(仅在未对齐时)→ `apksigner sign`(APK,密码走 `env:`)/
+`jarsigner`(AAB)。
+
+> ⚠️ AAB 用 `jarsigner` 签,而 JDK 17 的 `jarsigner` **不支持** `-storepass:env`,
+> 所以 AAB 补签时密码会出现在命令行上(`ps` 可见)。runner 是一次性独占虚拟机,
+> 可接受;多租户机器上不要开 `mode=sign`。
 
 ## 2. 方式 A:整条流水线(reusable workflow)
 
@@ -149,7 +158,7 @@ ANDROID_HOME=/opt/android-sdk bash scripts/local-selftest-android.sh
 | Apple | Android | 说明 |
 |---|---|---|
 | `artifact` | `apk` / `aab` | Android 常两个都发,所以是两个参数 |
-| `mode: adhoc/developer-id` | —(v0.1.0 只有校验) | 签名在构建期完成 |
+| `mode: adhoc/developer-id` | `mode: verify/sign` | `verify` 用于「构建期已签名」,`sign` 用于未签名产物 |
 | `p12_base64` / `p12_password` | `ANDROID_KEYSTORE_BASE64` / `ANDROID_STORE_PASSWORD` / `ANDROID_KEY_PASSWORD` / `ANDROID_KEY_ALIAS` | 密钥还原 |
 | `identity` / `team_id` | `expected_sha256` | 用证书指纹锁死「是不是同一把密钥」 |
 | `entitlements` | `forbidden_strings` / `require_abis` / `min_target_sdk` | 都是产物级断言 |
@@ -166,5 +175,7 @@ ANDROID_HOME=/opt/android-sdk bash scripts/local-selftest-android.sh
 | `签名指纹 … 不在期望列表里` | 换了密钥,或 secrets 指到了另一把 keystore |
 | `keystore 打不开或别名 … 不存在` | base64 截断、`ANDROID_KEY_ALIAS` 写错,或 PKCS12 的 key 密码与 store 密码不一致 |
 | `versionName 不符` | tag 与产物版本对不上;用 `version_file` 提前拦住更省事 |
+| `mode=sign 需要 keystore_base64` | 没传密钥;`sign` 模式必须有 4 个凭据输入 |
+| `apksigner sign 失败` | keystore 密码/别名不对,或 PKCS12 的 key 密码与 store 密码不一致 |
 | run 直接 `startup_failure`(只有「workflow file issue」) | 调用方 job 的 `permissions` 比被调 workflow 声明的窄。它声明 `contents: write`,调用方必须给 write(只允许降权) |
 | 四个密钥在日志里都是空、构建产物是 `app-release-unsigned.apk` | `secrets: inherit` 跨 owner 没生效;改成逐项显式映射 |
