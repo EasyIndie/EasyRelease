@@ -80,7 +80,7 @@ _ar_check_apk() {
   fi
 
   local badging
-  if ! badging="$("$EASYRELEASE_TOOL_AAPT2" dump badging "$apk" 2>/dev/null)"; then
+  if ! badging="$("$EASYRELEASE_TOOL_AAPT2" dump badging "$(easyrelease_tool_path "$apk")" 2>/dev/null)"; then
     _ar_bad "aapt2 读不出 APK 清单(路径或文件损坏?):$apk"
     return 0
   fi
@@ -158,7 +158,8 @@ _ar_check_apk() {
     fi
   fi
 
-  if ! "$EASYRELEASE_TOOL_APKSIGNER" verify --print-certs "$apk" > "$work/apk-certs.txt" 2>&1; then
+  if ! easyrelease_run_tool "$EASYRELEASE_TOOL_APKSIGNER" verify --print-certs \
+       "$(easyrelease_tool_path "$apk")" > "$work/apk-certs.txt" 2>&1; then
     _ar_bad "APK 没有有效签名(apksigner 校验失败)"
   else
     EASYRELEASE_ANDROID_FINGERPRINT="$(awk -F': ' '/SHA-256 digest/ { print tolower($NF); exit }' "$work/apk-certs.txt")"
@@ -193,7 +194,7 @@ _ar_aab_fingerprint() {
   rm -f "$work/aab-cert.rsa"
   unzip -p "$aab" 'META-INF/*.RSA' > "$work/aab-cert.rsa" 2>/dev/null || true
   [ -s "$work/aab-cert.rsa" ] || return 0
-  "$EASYRELEASE_TOOL_KEYTOOL" -printcert -file "$work/aab-cert.rsa" 2>/dev/null \
+  "$EASYRELEASE_TOOL_KEYTOOL" -printcert -file "$(easyrelease_tool_path "$work/aab-cert.rsa")" 2>/dev/null \
     | awk -F': ' '/SHA256:/ { print $2; exit }' \
     | tr -d ':' | tr 'A-F' 'a-f'
 }
@@ -248,7 +249,7 @@ _ar_check_aab() {
 
   # 不用 -strict:upload key 是自签证书,jarsigner -strict 会把「证书链不受信任」
   # 算成 signer error(rc=4),而商店只关心「是否由登记的 upload key 签名」。
-  if "$EASYRELEASE_TOOL_JARSIGNER" -verify "$aab" > "$work/aab-jarsigner.txt" 2>&1 \
+  if "$EASYRELEASE_TOOL_JARSIGNER" -verify "$(easyrelease_tool_path "$aab")" > "$work/aab-jarsigner.txt" 2>&1 \
      && grep -q 'jar verified' "$work/aab-jarsigner.txt"; then
     _ar_ok "AAB 已签名(jarsigner 校验通过)"
     EASYRELEASE_ANDROID_AAB_VERIFIED=true

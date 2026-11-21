@@ -38,9 +38,10 @@ easyrelease_sign_apk() {
 
   # zipalign 必须在签名之前:签名后改内容会让 v2/v3 摘要失效。
   local source="$input"
-  if ! "$EASYRELEASE_TOOL_ZIPALIGN" -c -p 4 "$input" >/dev/null 2>&1; then
+  if ! "$EASYRELEASE_TOOL_ZIPALIGN" -c -p 4 "$(easyrelease_tool_path "$input")" >/dev/null 2>&1; then
     source="$work/aligned.apk"
-    "$EASYRELEASE_TOOL_ZIPALIGN" -p 4 -f "$input" "$source" >/dev/null 2>&1 \
+    "$EASYRELEASE_TOOL_ZIPALIGN" -p 4 -f "$(easyrelease_tool_path "$input")" \
+      "$(easyrelease_tool_path "$source")" >/dev/null 2>&1 \
       || die "zipalign 失败:$input"
     ok "zipalign 已重新对齐"
   else
@@ -51,11 +52,12 @@ easyrelease_sign_apk() {
   EASYRELEASE_KS_STORE_PASS="$store_password" \
   EASYRELEASE_KS_KEY_PASS="$key_password" \
     easyrelease_run_tool "$EASYRELEASE_TOOL_APKSIGNER" sign \
-      --ks "$keystore" \
+      --ks "$(easyrelease_tool_path "$keystore")" \
       --ks-pass env:EASYRELEASE_KS_STORE_PASS \
       --ks-key-alias "$key_alias" \
       --key-pass env:EASYRELEASE_KS_KEY_PASS \
-      --out "$output" "$source" >/dev/null 2>&1 \
+      --out "$(easyrelease_tool_path "$output")" "$(easyrelease_tool_path "$source")" \
+      >/dev/null 2>&1 \
     || die "apksigner sign 失败(检查 keystore / 别名 / 密码)"
 
   EASYRELEASE_SIGNED_APK="$output"
@@ -70,10 +72,10 @@ easyrelease_sign_aab() {
   mkdir -p "$(dirname "$output")"
   cp "$input" "$output"
 
-  "$EASYRELEASE_TOOL_JARSIGNER" -keystore "$keystore" \
+  "$EASYRELEASE_TOOL_JARSIGNER" -keystore "$(easyrelease_tool_path "$keystore")" \
     -storepass "$store_password" -keypass "$key_password" \
     -sigalg SHA256withRSA -digestalg SHA-256 \
-    "$output" "$key_alias" >/dev/null 2>&1 \
+    "$(easyrelease_tool_path "$output")" "$key_alias" >/dev/null 2>&1 \
     || die "jarsigner 签名 AAB 失败(检查 keystore / 别名 / 密码)"
 
   EASYRELEASE_SIGNED_AAB="$output"
